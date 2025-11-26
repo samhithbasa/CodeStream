@@ -42,16 +42,59 @@
   </div>
 
   <script>
-    // Redirect to backend Google OAuth route
-    document.getElementById("googleLoginBtn").addEventListener("click", function () {
-      window.location.href = "/auth/google";
+    // Check for OAuth errors on page load
+    document.addEventListener('DOMContentLoaded', function () {
+      const urlParams = new URLSearchParams(window.location.search);
+      const error = urlParams.get('error');
+
+      if (error) {
+        let errorMessage = 'Authentication failed. Please try again.';
+
+        switch (error) {
+          case 'no_code':
+            errorMessage = 'Google authentication failed. No authorization code received.';
+            break;
+          case 'auth_failed':
+            errorMessage = 'Google authentication failed. Please try again.';
+            break;
+          case 'oauth_failed':
+            errorMessage = 'OAuth configuration error. Please contact support.';
+            break;
+        }
+
+        showMessage(errorMessage, 'error');
+      }
     });
 
     function showMessage(msg, type) {
       const messageBox = document.getElementById('message');
       messageBox.textContent = msg;
       messageBox.className = 'message ' + type;
+      messageBox.style.display = 'block';
     }
+
+    // Redirect to backend Google OAuth route - FIXED VERSION
+    document.getElementById("googleLoginBtn").addEventListener("click", function (e) {
+      e.preventDefault();
+      console.log('Google login button clicked');
+
+      // Get the redirect parameter from current URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const redirect = urlParams.get('redirect');
+
+      console.log('Current redirect parameter:', redirect);
+
+      // Build the Google OAuth URL
+      let authUrl = "/auth/google";
+
+      // Add redirect parameter if it exists
+      if (redirect) {
+        authUrl += `?redirect=${encodeURIComponent(redirect)}`;
+      }
+
+      console.log('Redirecting to Google OAuth:', authUrl);
+      window.location.href = authUrl;
+    });
   </script>
   <script src="js/login.js"></script>
 </body>

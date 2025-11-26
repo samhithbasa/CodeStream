@@ -199,14 +199,38 @@ app.get('/pricing', (req, res) => {
 
 // Google OAuth routes - MOVED BEFORE CATCH-ALL
 app.get('/auth/google', (req, res) => {
-    const authUrl = getGoogleAuthURL();
-    res.redirect(authUrl);
+    try {
+        const { redirect } = req.query;
+        console.log('🔵 [GOOGLE OAUTH] Initiated, redirect:', redirect || 'none');
+        
+        // Generate auth URL with state parameter for redirect
+        const authUrl = oauth2Client.generateAuthUrl({
+            access_type: 'offline',
+            prompt: 'consent',
+            scope: [
+                'https://www.googleapis.com/auth/userinfo.profile',
+                'https://www.googleapis.com/auth/userinfo.email'
+            ],
+            // Include redirect URL in state parameter
+            state: redirect ? Buffer.from(JSON.stringify({ redirect })).toString('base64') : ''
+        });
+        
+        console.log('🔵 [GOOGLE OAUTH] Redirecting to Google');
+        res.redirect(authUrl);
+        
+    } catch (error) {
+        console.error('🔴 [GOOGLE OAUTH] Initiation error:', error);
+        res.redirect('/login?error=oauth_failed');
+    }
 });
 
 // Google OAuth callback route
+// Google OAuth callback route - Update this in your API.js
+// Google OAuth callback route
 app.get('/auth/google/callback', async (req, res) => {
     try {
-        const { code } = req.query;
+        const { code, state } = req.query;
+        console.log('Google OAuth callback received:', { code: code ? 'EXISTS' : 'MISSING', state });
 
         if (!code) {
             return res.status(400).json({ error: 'Authorization code missing' });
@@ -223,6 +247,7 @@ app.get('/auth/google/callback', async (req, res) => {
         });
 
         const { data } = await oauth2.userinfo.get();
+        console.log('Google user info:', { email: data.email, name: data.name });
 
         // Check if user exists in your database
         const db = getDb();
@@ -243,6 +268,9 @@ app.get('/auth/google/callback', async (req, res) => {
 
             const result = await users.insertOne(newUser);
             user = { ...newUser, _id: result.insertedId };
+            console.log('New Google user created:', user.email);
+        } else {
+            console.log('Existing Google user found:', user.email);
         }
 
         // Generate JWT token
@@ -255,12 +283,34 @@ app.get('/auth/google/callback', async (req, res) => {
             { expiresIn: '7d' }
         );
 
-        // Redirect to editor with token
-        res.redirect(`/frontend-editor?token=${token}`);
+        // Parse state parameter for redirect URL
+        let redirectUrl = '/editor'; // default
+        if (state) {
+            try {
+                const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
+                redirectUrl = stateData.redirect || redirectUrl;
+                console.log('Redirect URL from state:', redirectUrl);
+            } catch (e) {
+                console.error('Error parsing state:', e);
+            }
+        }
+
+        // Redirect to the intended page with token
+        const redirectWithToken = `${redirectUrl}?token=${token}`;
+        console.log('Final redirect URL:', redirectWithToken);
+        res.redirect(redirectWithToken);
 
     } catch (error) {
         console.error('Google OAuth callback error:', error);
-        res.status(500).send('Authentication failed. Please try again.');
+        res.status(500).send(`
+            <html>
+                <body>
+                    <h1>Authentication Failed</h1>
+                    <p>Please try again later.</p>
+                    <a href="/login">Return to Login</a>
+                </body>
+            </html>
+        `);
     }
 });
 
@@ -960,20 +1010,46 @@ app.delete('/delete-code/:id', authenticateToken, (req, res) => {
 
 app.post('/api/frontend/save', async (req, res) => {
     try {
-        const { html, css, js, name } = req.body;
+        const { name, files, assets, html, css, js } = req.body;
         const projectId = uuidv4();
+
+        // Handle both old format (html, css, js) and new format (files object)
+        let projectFiles;
+        if (files && typeof files === 'object') {
+            // New format with multiple files
+            projectFiles = {
+                html: files.html || [{ name: 'index.html', content: getDefaultHTML() }],
+                css: files.css || [{ name: 'style.css', content: getDefaultCSS() }],
+                js: files.js || [{ name: 'script.js', content: getDefaultJS() }],
+                assets: assets || []
+            };
+        } else {
+            // Old format - convert to new format
+            projectFiles = {
+                html: [{ name: 'index.html', content: html || getDefaultHTML() }],
+                css: [{ name: 'style.css', content: css || getDefaultCSS() }],
+                js: [{ name: 'script.js', content: js || getDefaultJS() }],
+                assets: assets || []
+            };
+        }
+
+        // Process and save assets to file system
+        const processedAssets = await processAndSaveAssets(projectFiles.assets, projectId);
 
         const projectData = {
             id: projectId,
             name: name || 'Untitled Project',
-            html: html || '',
-            css: css || '',
-            js: js || '',
+            files: {
+                html: projectFiles.html,
+                css: projectFiles.css,
+                js: projectFiles.js,
+                assets: processedAssets
+            },
             createdAt: new Date(),
             updatedAt: new Date()
         };
 
-        // Save to file system
+        // Save project data to file system
         const projectPath = path.join(FRONTEND_STORAGE_DIR, `${projectId}.json`);
         fs.writeFileSync(projectPath, JSON.stringify(projectData, null, 2));
 
@@ -985,7 +1061,164 @@ app.post('/api/frontend/save', async (req, res) => {
         });
     } catch (error) {
         console.error('Error saving frontend project:', error);
-        res.status(500).json({ error: 'Failed to save project' });
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to save project: ' + error.message 
+        });
+    }
+});
+
+// Helper function to process and save assets
+async function processAndSaveAssets(assets, projectId) {
+    if (!assets || !Array.isArray(assets)) {
+        return [];
+    }
+
+    const processedAssets = [];
+    const assetDir = path.join(FRONTEND_STORAGE_DIR, 'assets', projectId);
+    
+    // Create asset directory if it doesn't exist
+    if (!fs.existsSync(assetDir)) {
+        fs.mkdirSync(assetDir, { recursive: true });
+    }
+
+    for (const asset of assets) {
+        try {
+            if (asset.data && asset.data.startsWith('data:')) {
+                // Handle base64 encoded assets
+                const matches = asset.data.match(/^data:([A-Za-z-+/]+);base64,(.+)$/);
+                if (matches && matches.length === 3) {
+                    const mimeType = matches[1];
+                    const base64Data = matches[2];
+                    const buffer = Buffer.from(base64Data, 'base64');
+                    
+                    // Determine file extension from mime type
+                    const extension = mimeType.split('/')[1] || 'bin';
+                    const fileName = `${uuidv4()}.${extension}`;
+                    const filePath = path.join(assetDir, fileName);
+                    
+                    // Save file to disk
+                    fs.writeFileSync(filePath, buffer);
+                    
+                    processedAssets.push({
+                        name: asset.name,
+                        fileName: fileName,
+                        mimeType: mimeType,
+                        url: `/api/frontend/assets/${projectId}/${fileName}`,
+                        originalName: asset.originalName || asset.name
+                    });
+                }
+            } else if (asset.url) {
+                // If asset already has a URL (from existing project), keep it
+                processedAssets.push(asset);
+            }
+        } catch (error) {
+            console.error('Error processing asset:', asset.name, error);
+            // Continue with other assets even if one fails
+        }
+    }
+
+    return processedAssets;
+}
+
+// Helper function to get default HTML content
+function getDefaultHTML() {
+    return `<!DOCTYPE html>
+<html>
+<head>
+    <title>My Project</title>
+</head>
+<body>
+    <h1>Hello World!</h1>
+    <p>Start building your amazing project...</p>
+    <button onclick="showAlert()">Click Me!</button>
+</body>
+</html>`;
+}
+
+// Helper function to get default CSS content
+function getDefaultCSS() {
+    return `body {
+    font-family: Arial, sans-serif;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    min-height: 100vh;
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: 30px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+button {
+    background: #ff6b6b;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 25px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.3s ease;
+}
+
+button:hover {
+    background: #ff5252;
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+}`;
+}
+
+// Helper function to get default JS content
+function getDefaultJS() {
+    return `function showAlert() {
+    alert('Hello from JavaScript! 🎉');
+    
+    // Create a new element
+    const newElement = document.createElement('div');
+    newElement.innerHTML = '<h3>Dynamic Content!</h3><p>This was added by JavaScript.</p>';
+    newElement.style.background = 'rgba(255,255,255,0.1)';
+    newElement.style.padding = '20px';
+    newElement.style.borderRadius = '10px';
+    newElement.style.marginTop = '20px';
+    
+    document.body.appendChild(newElement);
+}
+
+// Add some interactive features
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Frontend playground loaded!');
+});`;
+}
+
+app.get('/api/frontend/assets/:projectId/:fileName', (req, res) => {
+    try {
+        const { projectId, fileName } = req.params;
+        const assetPath = path.join(FRONTEND_STORAGE_DIR, 'assets', projectId, fileName);
+        
+        if (!fs.existsSync(assetPath)) {
+            return res.status(404).json({ error: 'Asset not found' });
+        }
+
+        // Set appropriate content type
+        const ext = path.extname(fileName).toLowerCase();
+        const contentTypes = {
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.png': 'image/png',
+            '.gif': 'image/gif',
+            '.svg': 'image/svg+xml',
+            '.webp': 'image/webp'
+        };
+
+        res.setHeader('Content-Type', contentTypes[ext] || 'application/octet-stream');
+        res.sendFile(assetPath);
+    } catch (error) {
+        console.error('Error serving asset:', error);
+        res.status(500).json({ error: 'Failed to serve asset' });
     }
 });
 
@@ -999,7 +1232,18 @@ app.get('/api/frontend/project/:id', (req, res) => {
         }
 
         const projectData = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
-        res.json(projectData);
+        
+        // Convert to old format for backward compatibility
+        const mainHtml = projectData.files.html.find(file => file.name === 'index.html') || projectData.files.html[0];
+        const mainCss = projectData.files.css.find(file => file.name === 'style.css') || projectData.files.css[0];
+        const mainJs = projectData.files.js.find(file => file.name === 'script.js') || projectData.files.js[0];
+
+        res.json({
+            ...projectData,
+            html: mainHtml.content,
+            css: mainCss.content,
+            js: mainJs.content
+        });
     } catch (error) {
         console.error('Error loading project:', error);
         res.status(500).json({ error: 'Failed to load project' });
@@ -1017,6 +1261,11 @@ app.get('/frontend/:id', (req, res) => {
 
         const projectData = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
 
+        // Combine all HTML, CSS, and JS files
+        const combinedHTML = projectData.files.html.map(file => file.content).join('\n');
+        const combinedCSS = projectData.files.css.map(file => file.content).join('\n');
+        const combinedJS = projectData.files.js.map(file => file.content).join('\n');
+
         const htmlContent = `
 <!DOCTYPE html>
 <html lang="en">
@@ -1024,11 +1273,11 @@ app.get('/frontend/:id', (req, res) => {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${projectData.name}</title>
-    <style>${projectData.css}</style>
+    <style>${combinedCSS}</style>
 </head>
 <body>
-    ${projectData.html}
-    <script>${projectData.js}</script>
+    ${combinedHTML}
+    <script>${combinedJS}</script>
 </body>
 </html>`;
 
@@ -1045,16 +1294,28 @@ app.get('/api/frontend/projects', authenticateToken, async (req, res) => {
         const projects = files
             .filter(file => file.endsWith('.json'))
             .map(file => {
-                const filePath = path.join(FRONTEND_STORAGE_DIR, file);
-                const projectData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-                return {
-                    id: projectData.id,
-                    name: projectData.name,
-                    createdAt: projectData.createdAt,
-                    updatedAt: projectData.updatedAt,
-                    shareUrl: `https://memory-update-production.up.railway.app/frontend/${projectData.id}`,
-                };
+                try {
+                    const filePath = path.join(FRONTEND_STORAGE_DIR, file);
+                    const projectData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                    return {
+                        id: projectData.id,
+                        name: projectData.name,
+                        createdAt: projectData.createdAt,
+                        updatedAt: projectData.updatedAt,
+                        shareUrl: `https://memory-update-production.up.railway.app/frontend/${projectData.id}`,
+                        fileCount: {
+                            html: projectData.files.html.length,
+                            css: projectData.files.css.length,
+                            js: projectData.files.js.length,
+                            assets: projectData.files.assets.length
+                        }
+                    };
+                } catch (error) {
+                    console.error(`Error processing project file ${file}:`, error);
+                    return null;
+                }
             })
+            .filter(project => project !== null)
             .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
 
         res.json(projects);
@@ -1065,6 +1326,7 @@ app.get('/api/frontend/projects', authenticateToken, async (req, res) => {
 });
 
 // Delete frontend project
+// Delete frontend project with asset cleanup
 app.delete('/api/frontend/project/:id', authenticateToken, async (req, res) => {
     try {
         const projectId = req.params.id;
@@ -1074,8 +1336,17 @@ app.delete('/api/frontend/project/:id', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'Project not found' });
         }
 
+        // Load project data to get asset information
+        const projectData = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
+        
         // Delete the project file
         fs.unlinkSync(projectPath);
+
+        // Delete associated assets directory
+        const assetDir = path.join(FRONTEND_STORAGE_DIR, 'assets', projectId);
+        if (fs.existsSync(assetDir)) {
+            fs.rmSync(assetDir, { recursive: true, force: true });
+        }
 
         res.json({
             success: true,
@@ -1445,7 +1716,7 @@ wss.on('connection', (ws) => {
                 tempFiles.push(filename);
                 console.log('📝 [DEBUG] Python file created:', filename);
 
-                command = 'python3';  // Changed from 'python' to 'python3'
+                command = 'python3';  
                 args = [filename];
                 console.log('⚙️ [DEBUG] Python execute command:', command, args);
                 break;

@@ -41,6 +41,174 @@ body {
     width: 200px;
 }
 
+/* File Explorer Styles */
+.file-explorer {
+    width: 280px;
+    background: #2d3748;
+    color: white;
+    border-right: 1px solid #4a5568;
+    transition: width 0.3s ease;
+    overflow-y: auto;
+}
+
+.file-explorer.collapsed {
+    width: 0;
+    min-width: 0;
+}
+
+.explorer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    background: #1a202c;
+    border-bottom: 1px solid #4a5568;
+}
+
+.toggle-btn {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.file-tree {
+    padding: 10px;
+}
+
+.folder {
+    margin-bottom: 10px;
+}
+
+.folder-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: #4a5568;
+    border-radius: 4px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.folder-header:hover {
+    background: #5a6578;
+}
+
+.add-file-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: white;
+    border-radius: 3px;
+    cursor: pointer;
+    padding: 2px 6px;
+    font-size: 12px;
+}
+
+.folder-content {
+    margin-left: 15px;
+    margin-top: 5px;
+    display: block;
+}
+
+.folder-content.collapsed {
+    display: none;
+}
+
+.file-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 10px;
+    margin: 2px 0;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.file-item:hover {
+    background: #4a5568;
+}
+
+.file-item.active {
+    background: #667eea;
+}
+
+.file-actions {
+    display: none;
+    gap: 5px;
+}
+
+.file-item:hover .file-actions {
+    display: flex;
+}
+
+.rename-btn, .delete-btn {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px;
+}
+
+/* Container layout */
+.container {
+    display: flex;
+    height: calc(100vh - 70px);
+}
+
+/* Dynamic tabs */
+.dynamic-tabs {
+    display: flex;
+    background: #2d3748;
+}
+
+.tab-close {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    margin-left: 5px;
+    padding: 0 5px;
+}
+
+/* Asset preview */
+.asset-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+}
+
+.asset-preview {
+    width: 30px;
+    height: 30px;
+    object-fit: cover;
+    border-radius: 3px;
+}
+
+/* Form styles */
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
 .btn {
     display: flex;
     align-items: center;

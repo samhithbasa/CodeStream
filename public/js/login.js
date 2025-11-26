@@ -28,10 +28,22 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
             messageDiv.textContent = data.message;
             messageDiv.classList.add('success');
             
-            // Show editor selection popup instead of direct redirect
-            setTimeout(() => {
-                showEditorSelectionPopup();
-            }, 1000);
+            // Get the redirect URL from URL parameters or default to editor
+            const urlParams = new URLSearchParams(window.location.search);
+            const redirectTo = urlParams.get('redirect') || '/editor';
+            
+            // Show editor selection popup or redirect directly
+            if (redirectTo === '/editor' || redirectTo === '/frontend-editor') {
+                // Redirect directly to the specific editor
+                setTimeout(() => {
+                    window.location.href = redirectTo;
+                }, 1000);
+            } else {
+                // Show editor selection for general login
+                setTimeout(() => {
+                    showEditorSelectionPopup();
+                }, 1000);
+            }
             
         } else {
             messageDiv.textContent = data.error;
@@ -44,8 +56,58 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
     }
 });
 
-// Add this function to show the editor selection popup
+// Update Google OAuth to handle redirects
+function handleGoogleAuth(response) {
+    const messageDiv = document.getElementById('message');
+    messageDiv.textContent = '';
+    messageDiv.className = 'message';
+    
+    verifyGoogleToken(response.credential)
+        .then(data => {
+            if (data.token) {
+                Cookies.set('token', data.token, { 
+                    expires: 7, 
+                    path: '/',
+                    secure: true,
+                    sameSite: 'strict'
+                });
+                
+                messageDiv.textContent = 'Google login successful!';
+                messageDiv.classList.add('success');
+                
+                // Get redirect URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const redirectTo = urlParams.get('redirect');
+                
+                if (redirectTo) {
+                    // Redirect directly to the requested page
+                    setTimeout(() => {
+                        window.location.href = redirectTo;
+                    }, 1000);
+                } else {
+                    // Show editor selection
+                    setTimeout(() => {
+                        showEditorSelectionPopup();
+                    }, 1000);
+                }
+            } else {
+                messageDiv.textContent = data.error || 'Google login failed';
+                messageDiv.classList.add('error');
+            }
+        })
+        .catch(error => {
+            messageDiv.textContent = 'Google login error. Please try again.';
+            messageDiv.classList.add('error');
+            console.error('Google Auth Error:', error);
+        });
+}
+
+// Update the editor selection popup to handle redirects
 function showEditorSelectionPopup() {
+    // Get the original redirect parameter if it exists
+    const urlParams = new URLSearchParams(window.location.search);
+    const originalRedirect = urlParams.get('redirect');
+    
     // Create popup overlay
     const popupOverlay = document.createElement('div');
     popupOverlay.className = 'editor-selection-overlay';
@@ -144,6 +206,7 @@ function showEditorSelectionPopup() {
         popupOverlay.style.animation = 'fadeOut 0.3s ease-out';
         setTimeout(() => {
             document.body.removeChild(popupOverlay);
+            // Redirect to code editor
             window.location.href = '/editor';
         }, 300);
     });
@@ -152,6 +215,7 @@ function showEditorSelectionPopup() {
         popupOverlay.style.animation = 'fadeOut 0.3s ease-out';
         setTimeout(() => {
             document.body.removeChild(popupOverlay);
+            // Redirect to frontend editor
             window.location.href = '/frontend-editor';
         }, 300);
     });
@@ -160,7 +224,8 @@ function showEditorSelectionPopup() {
         popupOverlay.style.animation = 'fadeOut 0.3s ease-out';
         setTimeout(() => {
             document.body.removeChild(popupOverlay);
-            window.location.href = '/landing.html';
+            // If there was an original redirect, go there, otherwise to landing
+            window.location.href = originalRedirect || '/landing.html';
         }, 300);
     });
 
@@ -183,7 +248,7 @@ function showEditorSelectionPopup() {
         if (e.key === 'Escape') {
             document.body.removeChild(popupOverlay);
             document.removeEventListener('keydown', handleEscape);
-            window.location.href = '/landing.html';
+            window.location.href = originalRedirect || '/landing.html';
         }
     };
     document.addEventListener('keydown', handleEscape);

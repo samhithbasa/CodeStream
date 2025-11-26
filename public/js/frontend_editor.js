@@ -3,63 +3,496 @@ console.log('Frontend Editor JavaScript loaded');
 class FrontendEditor {
     constructor() {
         this.currentProject = null;
+        this.files = {
+            html: [{ name: 'index.html', content: this.getDefaultHTML() }],
+            css: [{ name: 'style.css', content: this.getDefaultCSS() }],
+            js: [{ name: 'script.js', content: this.getDefaultJS() }],
+            assets: []
+        };
+        this.activeFile = { type: 'html', name: 'index.html' };
         this.init();
+    }
+
+    getDefaultHTML() {
+        return `<!DOCTYPE html>
+<html>
+<head>
+    <title>My Project</title>
+</head>
+<body>
+    <h1>Hello World!</h1>
+    <p>Start building your amazing project...</p>
+    <button onclick="showAlert()">Click Me!</button>
+</body>
+</html>`;
+    }
+
+    getDefaultCSS() {
+        return `body {
+    font-family: Arial, sans-serif;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    min-height: 100vh;
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: 30px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+button {
+    background: #ff6b6b;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 25px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.3s ease;
+}
+
+button:hover {
+    background: #ff5252;
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+}`;
+    }
+
+    getDefaultJS() {
+        return `function showAlert() {
+    alert('Hello from JavaScript! 🎉');
+    
+    // Create a new element
+    const newElement = document.createElement('div');
+    newElement.innerHTML = '<h3>Dynamic Content!</h3><p>This was added by JavaScript.</p>';
+    newElement.style.background = 'rgba(255,255,255,0.1)';
+    newElement.style.padding = '20px';
+    newElement.style.borderRadius = '10px';
+    newElement.style.marginTop = '20px';
+    
+    document.body.appendChild(newElement);
+}
+
+// Add some interactive features
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Frontend playground loaded!');
+});`;
     }
 
     init() {
         this.bindEvents();
+        this.renderFileTree();
+        this.createEditorTab('html', 'index.html');
         this.updatePreview();
         this.checkAuth();
     }
 
     bindEvents() {
-        // Tab switching
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                this.switchTab(e.target.dataset.tab);
-            });
-        });
-
-        // Editor changes
-        document.getElementById('html-editor').addEventListener('input', () => this.updatePreview());
-        document.getElementById('css-editor').addEventListener('input', () => this.updatePreview());
-        document.getElementById('js-editor').addEventListener('input', () => this.updatePreview());
-
-        // Save project
+        // Existing events
         document.getElementById('save-project').addEventListener('click', () => this.saveProject());
-
-        // Projects modal
         document.getElementById('show-projects').addEventListener('click', () => this.showProjects());
         document.querySelector('.modal-close').addEventListener('click', () => this.hideModal());
         document.getElementById('projects-modal').addEventListener('click', (e) => {
             if (e.target === e.currentTarget) this.hideModal();
         });
-
-        // Logout
         document.getElementById('logout-btn').addEventListener('click', () => this.logout());
+
+        // New events
+        document.getElementById('add-file').addEventListener('click', () => this.showAddFileModal());
+        document.getElementById('upload-asset').addEventListener('click', () => this.showUploadAssetModal());
+        document.getElementById('toggle-explorer').addEventListener('click', () => this.toggleExplorer());
+
+        // Folder toggle
+        document.querySelectorAll('.folder-header').forEach(header => {
+            header.addEventListener('click', (e) => {
+                if (!e.target.classList.contains('add-file-btn')) {
+                    this.toggleFolder(header.dataset.folder);
+                }
+            });
+        });
+
+        // Add file buttons
+        document.querySelectorAll('.add-file-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const type = btn.dataset.type;
+                if (type === 'asset') {
+                    this.showUploadAssetModal();
+                } else {
+                    this.showAddFileModal(type);
+                }
+            });
+        });
+
+        // Form submissions
+        document.getElementById('add-file-form').addEventListener('submit', (e) => this.handleAddFile(e));
+        document.getElementById('upload-asset-form').addEventListener('submit', (e) => this.handleUploadAsset(e));
+
+        // Modal close events
+        document.querySelectorAll('.modal-close').forEach(btn => {
+            btn.addEventListener('click', () => this.hideAllModals());
+        });
     }
 
-    switchTab(tabName) {
+    renderFileTree() {
+        // Render HTML files
+        this.renderFileList('html-files', 'html');
+        // Render CSS files
+        this.renderFileList('css-files', 'css');
+        // Render JS files
+        this.renderFileList('js-files', 'js');
+        // Render assets
+        this.renderAssets();
+    }
+
+    renderFileList(containerId, fileType) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = this.files[fileType].map(file => `
+            <div class="file-item ${this.activeFile.type === fileType && this.activeFile.name === file.name ? 'active' : ''}" 
+                 data-type="${fileType}" data-file="${file.name}">
+                <span>${file.name}</span>
+                <div class="file-actions">
+                    <button class="rename-btn" onclick="frontendEditor.renameFile('${fileType}', '${file.name}')">✏️</button>
+                    <button class="delete-btn" onclick="frontendEditor.deleteFile('${fileType}', '${file.name}')">🗑️</button>
+                </div>
+            </div>
+        `).join('');
+
+        // Add click events
+        container.querySelectorAll('.file-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                if (!e.target.classList.contains('rename-btn') && !e.target.classList.contains('delete-btn')) {
+                    const type = item.dataset.type;
+                    const name = item.dataset.file;
+                    this.openFile(type, name);
+                }
+            });
+        });
+    }
+
+    renderAssets() {
+        const container = document.getElementById('asset-files');
+        if (this.files.assets.length === 0) {
+            container.innerHTML = '<div style="padding: 10px; color: #a0aec0; font-size: 12px;">No assets uploaded</div>';
+            return;
+        }
+
+        container.innerHTML = this.files.assets.map(asset => `
+            <div class="asset-item">
+                <img src="${asset.url}" alt="${asset.name}" class="asset-preview">
+                <span style="flex: 1; font-size: 12px;">${asset.name}</span>
+                <button class="delete-btn" onclick="frontendEditor.deleteAsset('${asset.name}')">🗑️</button>
+            </div>
+        `).join('');
+    }
+
+    openFile(type, name) {
+        this.activeFile = { type, name };
+
+        // Update file tree active states
+        document.querySelectorAll('.file-item').forEach(item => {
+            item.classList.remove('active');
+        });
+        document.querySelector(`[data-type="${type}"][data-file="${name}"]`).classList.add('active');
+
+        // Create or switch to tab
+        this.createEditorTab(type, name);
+    }
+
+    createEditorTab(type, name) {
+        const tabId = `${type}-${name.replace('.', '-')}`;
+        let tab = document.querySelector(`[data-tab="${tabId}"]`);
+
+        if (!tab) {
+            // Create new tab
+            tab = document.createElement('button');
+            tab.className = 'tab-btn';
+            tab.dataset.tab = tabId;
+            tab.innerHTML = `
+                ${this.getFileIcon(type)} ${name}
+                <button class="tab-close">&times;</button>
+            `;
+
+            // Insert before preview tab
+            const previewTab = document.querySelector('[data-tab="preview"]');
+            previewTab.parentNode.insertBefore(tab, previewTab);
+
+            // Create editor content
+            const content = document.createElement('div');
+            content.className = 'tab-content';
+            content.id = `${tabId}-tab`;
+
+            const file = this.getFile(type, name);
+            content.innerHTML = `
+                <textarea placeholder="Write your ${type.toUpperCase()} here...">${file ? file.content : ''}</textarea>
+            `;
+
+            document.querySelector('.editor-content').insertBefore(content, document.getElementById('preview-tab'));
+
+            // Add event listeners
+            tab.querySelector('.tab-close').addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.closeTab(tabId);
+            });
+
+            tab.addEventListener('click', () => this.switchTab(tabId));
+
+            // Add input event to editor
+            content.querySelector('textarea').addEventListener('input', (e) => {
+                this.updateFileContent(type, name, e.target.value);
+                this.updatePreview();
+            });
+        }
+
+        this.switchTab(tabId);
+    }
+
+    getFileIcon(type) {
+        const icons = {
+            html: '📄',
+            css: '🎨',
+            js: '⚡',
+            asset: '🖼️'
+        };
+        return icons[type] || '📄';
+    }
+
+    getFile(type, name) {
+        return this.files[type].find(file => file.name === name);
+    }
+
+    updateFileContent(type, name, content) {
+        const file = this.getFile(type, name);
+        if (file) {
+            file.content = content;
+        }
+    }
+
+    switchTab(tabId) {
         // Update active tab button
         document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.tab === tabName);
+            btn.classList.toggle('active', btn.dataset.tab === tabId);
         });
 
         // Update active tab content
         document.querySelectorAll('.tab-content').forEach(content => {
-            content.classList.toggle('active', content.id === `${tabName}-tab`);
+            content.classList.toggle('active', content.id === `${tabId}-tab`);
         });
 
         // Update preview when switching to preview tab
-        if (tabName === 'preview') {
+        if (tabId === 'preview') {
             this.updatePreview();
         }
     }
 
+    closeTab(tabId) {
+        if (tabId === 'preview') return;
+
+        const tab = document.querySelector(`[data-tab="${tabId}"]`);
+        const content = document.getElementById(`${tabId}-tab`);
+
+        if (tab && content) {
+            tab.remove();
+            content.remove();
+        }
+
+        // Switch to preview tab if closing active tab
+        if (tab.classList.contains('active')) {
+            this.switchTab('preview');
+        }
+    }
+
+    showAddFileModal(preSelectedType = '') {
+        if (preSelectedType) {
+            document.getElementById('file-type').value = preSelectedType;
+        }
+        document.getElementById('add-file-modal').style.display = 'block';
+    }
+
+    showUploadAssetModal() {
+        document.getElementById('upload-asset-modal').style.display = 'block';
+    }
+
+    hideAllModals() {
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.style.display = 'none';
+        });
+    }
+
+    handleAddFile(e) {
+        e.preventDefault();
+        const type = document.getElementById('file-type').value;
+        let name = document.getElementById('file-name').value.trim();
+
+        // Add extension if missing
+        if (!name.includes('.')) {
+            const extensions = { html: '.html', css: '.css', js: '.js' };
+            name += extensions[type];
+        }
+
+        // Check if file already exists
+        if (this.getFile(type, name)) {
+            alert('A file with this name already exists!');
+            return;
+        }
+
+        // Add new file
+        this.files[type].push({
+            name: name,
+            content: this.getDefaultContent(type)
+        });
+
+        // Update UI
+        this.renderFileTree();
+        this.hideAllModals();
+        this.openFile(type, name);
+
+        // Reset form
+        e.target.reset();
+    }
+
+    getDefaultContent(type) {
+        const defaults = {
+            html: '<div><!-- New HTML file --></div>',
+            css: '/* New CSS file */',
+            js: '// New JavaScript file'
+        };
+        return defaults[type] || '';
+    }
+
+    async handleUploadAsset(e) {
+        e.preventDefault();
+        const fileInput = document.getElementById('asset-file');
+        const nameInput = document.getElementById('asset-name');
+
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        const fileName = nameInput.value.trim() || file.name;
+
+        // Simulate upload (you'll need to implement actual file upload)
+        const assetUrl = URL.createObjectURL(file);
+
+        this.files.assets.push({
+            name: fileName,
+            url: assetUrl,
+            file: file
+        });
+
+        // Update UI
+        this.renderAssets();
+        this.hideAllModals();
+
+        // Reset form
+        e.target.reset();
+    }
+
+    deleteFile(type, name) {
+        if (this.files[type].length <= 1) {
+            alert(`You must have at least one ${type.toUpperCase()} file!`);
+            return;
+        }
+
+        if (!confirm(`Delete ${name}?`)) return;
+
+        this.files[type] = this.files[type].filter(file => file.name !== name);
+
+        // Close tab if open
+        this.closeTab(`${type}-${name.replace('.', '-')}`);
+
+        // Update UI
+        this.renderFileTree();
+
+        // Switch to first file of same type if active file was deleted
+        if (this.activeFile.type === type && this.activeFile.name === name) {
+            const newFile = this.files[type][0];
+            this.openFile(type, newFile.name);
+        }
+    }
+
+    deleteAsset(name) {
+        if (!confirm(`Delete ${name}?`)) return;
+
+        this.files.assets = this.files.assets.filter(asset => asset.name !== name);
+        this.renderAssets();
+    }
+
+    renameFile(type, oldName) {
+        const newName = prompt('Enter new file name:', oldName);
+        if (!newName || newName === oldName) return;
+
+        // Add extension if missing
+        let finalName = newName;
+        if (!finalName.includes('.')) {
+            const extensions = { html: '.html', css: '.css', js: '.js' };
+            finalName += extensions[type];
+        }
+
+        // Check if name already exists
+        if (this.getFile(type, finalName)) {
+            alert('A file with this name already exists!');
+            return;
+        }
+
+        const file = this.getFile(type, oldName);
+        file.name = finalName;
+
+        // Update active file if this was the active file
+        if (this.activeFile.type === type && this.activeFile.name === oldName) {
+            this.activeFile.name = finalName;
+        }
+
+        // Update UI
+        this.renderFileTree();
+
+        // Update tab
+        const oldTabId = `${type}-${oldName.replace('.', '-')}`;
+        const newTabId = `${type}-${finalName.replace('.', '-')}`;
+        const tab = document.querySelector(`[data-tab="${oldTabId}"]`);
+        if (tab) {
+            tab.dataset.tab = newTabId;
+            tab.innerHTML = `
+                ${this.getFileIcon(type)} ${finalName}
+                <button class="tab-close">&times;</button>
+            `;
+            tab.querySelector('.tab-close').addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.closeTab(newTabId);
+            });
+        }
+
+        const content = document.getElementById(`${oldTabId}-tab`);
+        if (content) {
+            content.id = `${newTabId}-tab`;
+        }
+    }
+
+    toggleExplorer() {
+        const explorer = document.querySelector('.file-explorer');
+        const toggleBtn = document.getElementById('toggle-explorer');
+
+        explorer.classList.toggle('collapsed');
+        toggleBtn.textContent = explorer.classList.contains('collapsed') ? '▶' : '◀';
+    }
+
+    toggleFolder(folderName) {
+        const content = document.querySelector(`[data-folder="${folderName}"]`).nextElementSibling;
+        content.classList.toggle('collapsed');
+    }
+
     updatePreview() {
-        const html = document.getElementById('html-editor').value;
-        const css = document.getElementById('css-editor').value;
-        const js = document.getElementById('js-editor').value;
+        const htmlFiles = this.files.html;
+        const cssFiles = this.files.css;
+        const jsFiles = this.files.js;
+
+        // Combine all files of each type
+        const combinedHTML = htmlFiles.map(file => file.content).join('\n');
+        const combinedCSS = cssFiles.map(file => file.content).join('\n');
+        const combinedJS = jsFiles.map(file => file.content).join('\n');
 
         const previewFrame = document.getElementById('preview-frame');
         const previewDocument = previewFrame.contentDocument || previewFrame.contentWindow.document;
@@ -69,11 +502,11 @@ class FrontendEditor {
             <!DOCTYPE html>
             <html>
             <head>
-                <style>${css}</style>
+                <style>${combinedCSS}</style>
             </head>
             <body>
-                ${html}
-                <script>${js}<\/script>
+                ${combinedHTML}
+                <script>${combinedJS}<\/script>
             </body>
             </html>
         `);
@@ -83,24 +516,24 @@ class FrontendEditor {
     async saveProject() {
         const token = Cookies.get('token');
         if (!token) {
-            alert('Please login to save your project');
+            // Redirect to login with return URL
+            const currentUrl = encodeURIComponent(window.location.href);
+            window.location.href = `/login?redirect=${currentUrl}`;
             return;
         }
 
         const saveBtn = document.getElementById('save-project');
         const originalText = saveBtn.innerHTML;
 
-        // Add saving state
         saveBtn.innerHTML = '💾 Saving...';
-        saveBtn.classList.add('saving');
         saveBtn.disabled = true;
 
         const projectName = document.getElementById('project-name').value.trim() || 'Untitled Project';
-        const html = document.getElementById('html-editor').value;
-        const css = document.getElementById('css-editor').value;
-        const js = document.getElementById('js-editor').value;
 
         try {
+            // Convert assets to base64 for saving
+            const assets = await this.processAssets();
+
             const response = await fetch('/api/frontend/save', {
                 method: 'POST',
                 headers: {
@@ -109,9 +542,8 @@ class FrontendEditor {
                 },
                 body: JSON.stringify({
                     name: projectName,
-                    html: html,
-                    css: css,
-                    js: js
+                    files: this.files,
+                    assets: assets
                 })
             });
 
@@ -119,7 +551,6 @@ class FrontendEditor {
 
             if (result.success) {
                 this.showSuccessNotification(result.shareUrl);
-                // Briefly show success state
                 saveBtn.innerHTML = '✅ Saved!';
                 setTimeout(() => {
                     saveBtn.innerHTML = originalText;
@@ -136,11 +567,38 @@ class FrontendEditor {
                 saveBtn.innerHTML = originalText;
             }, 2000);
         } finally {
-            saveBtn.classList.remove('saving');
             saveBtn.disabled = false;
         }
     }
 
+    async processAssets() {
+        const processedAssets = [];
+
+        for (const asset of this.files.assets) {
+            if (asset.file) {
+                const base64 = await this.fileToBase64(asset.file);
+                processedAssets.push({
+                    name: asset.name,
+                    data: base64,
+                    type: asset.file.type
+                });
+            } else {
+                // Asset already processed (from loaded project)
+                processedAssets.push(asset);
+            }
+        }
+
+        return processedAssets;
+    }
+
+    fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = error => reject(error);
+        });
+    }
     showSuccessNotification(shareUrl) {
         // Copy URL to clipboard
         navigator.clipboard.writeText(shareUrl).then(() => {
