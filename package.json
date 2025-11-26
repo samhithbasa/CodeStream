@@ -4,7 +4,6 @@
   "main": "landing.js",
   "scripts": {
     "start": "node Api.js",
-    "postinstall": "apt-get update && apt-get install -y python3 g++ default-jdk",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",

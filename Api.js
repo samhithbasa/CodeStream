@@ -287,6 +287,41 @@ app.get('/test-auth', (req, res) => {
     });
 });
 
+// Add this debug route to check compilers
+app.get('/check-compilers', (req, res) => {
+    const { exec } = require('child_process');
+    
+    const commands = [
+        { name: 'python3', cmd: 'python3 --version' },
+        { name: 'python', cmd: 'python --version' },
+        { name: 'g++', cmd: 'g++ --version' },
+        { name: 'javac', cmd: 'javac -version' },
+        { name: 'java', cmd: 'java -version' }
+    ];
+
+    const results = {};
+    let completed = 0;
+
+    commands.forEach(({name, cmd}) => {
+        exec(cmd, (error, stdout, stderr) => {
+            results[name] = {
+                installed: !error,
+                output: stdout || stderr,
+                error: error ? error.message : null
+            };
+            completed++;
+            
+            if (completed === commands.length) {
+                res.json({
+                    platform: process.platform,
+                    arch: process.arch,
+                    nodeVersion: process.version,
+                    results: results
+                });
+            }
+        });
+    });
+});
 
 
 function authenticateAdmin(req, res, next) {
