@@ -1253,19 +1253,26 @@ app.get('*', (req, res) => {
 
 // WebSocket connection handling
 wss.on('connection', (ws) => {
-    console.log('New terminal connection');
+    console.log('🔵 [DEBUG] New terminal WebSocket connection established');
+    
     let process = null;
-    let tempFiles = []; // Track temp files for cleanup
-    let currentJavaClassName = 'Main'; // Store Java class name
+    let tempFiles = [];
+    let currentJavaClassName = 'Main';
 
     ws.on('message', (data) => {
         try {
             const message = JSON.parse(data);
-            console.log('Received message type:', message.type);
+            console.log('📨 [DEBUG] WebSocket message received:', {
+                type: message.type,
+                lang: message.lang,
+                codeLength: message.code ? message.code.length : 0
+            });
 
             switch (message.type) {
                 case 'execute':
+                    console.log('🚀 [DEBUG] Execute command received for language:', message.lang);
                     if (process) {
+                        console.log('⚠️ [DEBUG] Killing previous process');
                         process.kill('SIGTERM');
                         setTimeout(() => cleanupTempFiles(), 1000);
                     }
@@ -1273,25 +1280,24 @@ wss.on('connection', (ws) => {
                     break;
 
                 case 'input':
-                    console.log('Sending input to process:', JSON.stringify(message.data));
+                    console.log('⌨️ [DEBUG] Input received:', JSON.stringify(message.data));
                     if (process && process.stdin && !process.stdin.destroyed) {
-                        // Ensure input ends with newline
                         let inputData = message.data;
                         if (!inputData.endsWith('\n')) {
                             inputData += '\n';
                         }
                         process.stdin.write(inputData);
-                        console.log('Input sent successfully with newline');
+                        console.log('✅ [DEBUG] Input sent to process');
                     } else {
-                        console.log('Process stdin not available');
+                        console.log('❌ [DEBUG] Process stdin not available or destroyed');
                     }
                     break;
 
-                case 'resize':
-                    break;
+                default:
+                    console.log('❓ [DEBUG] Unknown message type:', message.type);
             }
         } catch (error) {
-            console.error('Error processing WebSocket message:', error);
+            console.error('💥 [DEBUG] Error processing WebSocket message:', error);
         }
     });
 
@@ -1348,8 +1354,14 @@ wss.on('connection', (ws) => {
     }
 
     function executeCode(ws, code, lang) {
-        // Auto-inject fflush(stdout) for C/C++ programs
+        console.log('🔧 [DEBUG] executeCode called with:', {
+            lang: lang,
+            codeLength: code.length,
+            first50Chars: code.substring(0, 50)
+        });
+
         const processedCode = autoInjectFlush(code, lang);
+        console.log('🔄 [DEBUG] Code processed for language:', lang);
 
         cleanupTempFiles();
         tempFiles = [];
@@ -1357,61 +1369,74 @@ wss.on('connection', (ws) => {
         const timestamp = Date.now();
         let filename, command, args;
 
-        // Reset Java class name
         currentJavaClassName = 'Main';
 
+        // ADD DEBUG LOGS FOR EACH LANGUAGE
         switch (lang) {
             case 'C':
+                console.log('🔵 [DEBUG] Processing C code');
                 filename = path.join(tempDir, `code-${timestamp}.c`);
                 fs.writeFileSync(filename, processedCode);
                 tempFiles.push(filename);
+                console.log('📝 [DEBUG] C file created:', filename);
 
                 const executable = path.join(tempDir, `code-${timestamp}.exe`);
                 tempFiles.push(executable);
 
                 command = 'gcc';
                 args = [filename, '-o', executable];
+                console.log('⚙️ [DEBUG] C compile command:', command, args);
                 break;
 
             case 'Cpp':
+                console.log('🔵 [DEBUG] Processing C++ code');
                 filename = path.join(tempDir, `code-${timestamp}.cpp`);
                 fs.writeFileSync(filename, processedCode);
                 tempFiles.push(filename);
+                console.log('📝 [DEBUG] C++ file created:', filename);
 
                 const cppExecutable = path.join(tempDir, `code-${timestamp}.exe`);
                 tempFiles.push(cppExecutable);
 
                 command = 'g++';
                 args = [filename, '-o', cppExecutable];
+                console.log('⚙️ [DEBUG] C++ compile command:', command, args);
                 break;
 
             case 'Python':
+                console.log('🐍 [DEBUG] Processing Python code');
                 filename = path.join(tempDir, `code-${timestamp}.py`);
-                fs.writeFileSync(filename, code);
+                fs.writeFileSync(filename, code); // Use original code for Python
                 tempFiles.push(filename);
+                console.log('📝 [DEBUG] Python file created:', filename);
 
                 command = 'python';
                 args = [filename];
+                console.log('⚙️ [DEBUG] Python execute command:', command, args);
                 break;
 
             case 'Java':
-                // Fix Java code structure if needed
+                console.log('☕ [DEBUG] Processing Java code');
                 const fixedJavaCode = fixJavaCode(code);
                 const classNameMatch = fixedJavaCode.match(/class\s+(\w+)/);
                 currentJavaClassName = classNameMatch ? classNameMatch[1] : 'Main';
+                console.log('📛 [DEBUG] Java class name:', currentJavaClassName);
 
                 filename = path.join(tempDir, `${currentJavaClassName}.java`);
                 fs.writeFileSync(filename, fixedJavaCode);
                 tempFiles.push(filename);
+                console.log('📝 [DEBUG] Java file created:', filename);
 
                 const classFile = path.join(tempDir, `${currentJavaClassName}.class`);
                 tempFiles.push(classFile);
 
                 command = 'javac';
                 args = [filename];
+                console.log('⚙️ [DEBUG] Java compile command:', command, args);
                 break;
 
             default:
+                console.log('❌ [DEBUG] Unsupported language:', lang);
                 ws.send(JSON.stringify({
                     type: 'output',
                     data: 'Unsupported language\r\n'
@@ -1421,6 +1446,7 @@ wss.on('connection', (ws) => {
 
         // Compile the code first for compiled languages
         if (lang === 'C' || lang === 'Cpp' || lang === 'Java') {
+            console.log('🔨 [DEBUG] Starting compilation for:', lang);
             const compileProcess = spawn(command, args, {
                 cwd: tempDir,
                 stdio: ['pipe', 'pipe', 'pipe']
@@ -1431,15 +1457,22 @@ wss.on('connection', (ws) => {
 
             compileProcess.stdout.on('data', (data) => {
                 compileOutput += data.toString();
+                console.log('📤 [DEBUG] Compile stdout:', data.toString());
             });
 
             compileProcess.stderr.on('data', (data) => {
                 compileError += data.toString();
+                console.log('📤 [DEBUG] Compile stderr:', data.toString());
             });
 
             compileProcess.on('close', (compileCode) => {
+                console.log('🔒 [DEBUG] Compilation finished with code:', compileCode);
+                console.log('📊 [DEBUG] Compile output:', compileOutput);
+                console.log('❌ [DEBUG] Compile errors:', compileError);
+
                 if (compileCode !== 0) {
                     const errorMessage = compileError || compileOutput || `Compilation failed with code ${compileCode}`;
+                    console.log('💥 [DEBUG] Compilation failed:', errorMessage);
                     ws.send(JSON.stringify({
                         type: 'output',
                         data: '\x1b[31m✗ Compilation failed:\x1b[0m\r\n' + errorMessage + '\r\n'
@@ -1451,6 +1484,8 @@ wss.on('connection', (ws) => {
                     setTimeout(() => cleanupTempFiles(), 1000);
                     return;
                 }
+
+                console.log('✅ [DEBUG] Compilation successful');
 
                 // Execute the compiled code
                 let executeCommand, executeArgs = [];
@@ -1473,6 +1508,12 @@ wss.on('connection', (ws) => {
             });
 
             compileProcess.on('error', (error) => {
+                console.error('💥 [DEBUG] Compilation process error:', {
+                    error: error.message,
+                    code: error.code,
+                    command: command,
+                    args: args
+                });
                 ws.send(JSON.stringify({
                     type: 'output',
                     data: `\x1b[31mCompilation error: ${error.message}\x1b[0m\r\n`
@@ -1483,26 +1524,29 @@ wss.on('connection', (ws) => {
                 }));
             });
         } else {
-            // For interpreted languages, just run the code
+            // For Python - ADD DEBUG LOGS HERE
+            console.log('🚀 [DEBUG] Direct execution for Python');
             runProcess(command, args);
         }
 
+
         function runProcess(cmd, args) {
-            console.log('Starting process:', cmd, args);
+            console.log('🎯 [DEBUG] runProcess called with:', { cmd, args });
+            
             process = spawn(cmd, args, {
                 cwd: tempDir,
                 stdio: ['pipe', 'pipe', 'pipe']
             });
 
+            console.log('✅ [DEBUG] Process spawned successfully, PID:', process.pid);
+
             process.stdout.on('data', (data) => {
                 const output = data.toString();
-                console.log('Process stdout:', output);
+                console.log('📤 [DEBUG] Process stdout:', output);
                 ws.send(JSON.stringify({
                     type: 'output',
                     data: output
                 }));
-
-                // Signal that program is running and might need input
                 ws.send(JSON.stringify({
                     type: 'program_running'
                 }));
@@ -1510,7 +1554,7 @@ wss.on('connection', (ws) => {
 
             process.stderr.on('data', (data) => {
                 const error = data.toString();
-                console.log('Process stderr:', error);
+                console.log('📤 [DEBUG] Process stderr:', error);
                 ws.send(JSON.stringify({
                     type: 'output',
                     data: '\x1b[31m' + error + '\x1b[0m'
@@ -1518,11 +1562,16 @@ wss.on('connection', (ws) => {
             });
 
             process.stdin.on('error', (err) => {
-                console.error('STDIN error:', err);
+                console.error('💥 [DEBUG] STDIN error:', err);
             });
 
             process.on('error', (error) => {
-                console.error('Process error:', error);
+                console.error('💥 [DEBUG] Process spawn error:', {
+                    error: error.message,
+                    code: error.code,
+                    cmd: cmd,
+                    args: args
+                });
                 ws.send(JSON.stringify({
                     type: 'output',
                     data: `\x1b[31mProcess error: ${error.message}\x1b[0m\r\n`
@@ -1530,7 +1579,7 @@ wss.on('connection', (ws) => {
             });
 
             process.on('close', (code) => {
-                console.log('Process closed with code:', code);
+                console.log('🔒 [DEBUG] Process closed with exit code:', code);
                 const exitMessage = code === 0 ?
                     '\x1b[32m✓ Program completed successfully\x1b[0m\r\n' :
                     `\x1b[33mProgram finished with exit code: ${code}\x1b[0m\r\n`;
