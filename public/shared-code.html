@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shared Code</title>
+    <link rel="stylesheet" href="/css/code.css">
+    <link rel="stylesheet" href="/js/codemirror-5.65.18/lib/codemirror.css">
+    <script src="/js/codemirror-5.65.18/lib/codemirror.js"></script>
+    <script src="/js/codemirror-5.65.18/addon/edit/closebrackets.js"></script>
+    <script src="/js/codemirror-5.65.18/mode/clike/clike.js"></script>
+    <script src="/js/codemirror-5.65.18/mode/python/python.js"></script>
+    <link rel="stylesheet" href="/js/codemirror-5.65.18/theme/material-darker.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+            width: 100%;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f5f5f5;
+        }
+
+        header {
+            padding: 12px 20px;
+            background: #555;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+
+        #logo {
+            height: 36px;
+            margin-right: 15px;
+        }
+
+        h1 {
+            align-items: center;
+            font-size: 1.3rem;
+            flex-grow: 1;
+            margin: 0 auto;
+        }
+
+        .shared-code-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .code-editor-wrapper {
+            flex: 1;
+            overflow: auto;
+            position: relative;
+        }
+
+        .CodeMirror {
+            height: 100% !important;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .code-info {
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #f0f0f0;
+            border-top: 1px solid #ddd;
+            position: sticky;
+            bottom: 0;
+            z-index: 5;
+        }
+
+        .code-info-content {
+            display: flex;
+            gap: 20px;
+        }
+
+        .code-info p {
+            margin: 0;
+            color: #555;
+            font-size: 0.9rem;
+            white-space: nowrap;
+        }
+
+        .code-info span {
+            font-weight: bold;
+            color: #333;
+        }
+
+        #copy-code {
+            padding: 8px 16px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            min-width: 100px;
+        }
+
+        #copy-code:hover {
+            background: #45a049;
+        }
+
+        #copy-notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 4px;
+            display: none;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            body {
+                background-color: #121212;
+                color: #e0e0e0;
+            }
+            
+            .shared-code-container {
+                background: #1e1e1e;
+            }
+            
+            .code-info {
+                background: #2d2d2d;
+                border-top: 1px solid #444;
+            }
+            
+            .code-info p {
+                color: #aaa;
+            }
+            
+            .code-info span {
+                color: #e0e0e0;
+            }
+            
+            header {
+                background: #2d2d2d;
+            }
+            
+            #copy-code {
+                background: #4CAF50;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <img src="../images/logo.jpg" id="logo">
+        <h1>Shared Code Viewer</h1>
+    </header>
+
+    <div class="shared-code-container">
+        <div class="code-editor-wrapper">
+            <textarea id="shared-code"></textarea>
+        </div>
+        <div class="code-info">
+            <div class="code-info-content">
+                <p>Language: <span id="shared-lang">Loading...</span></p>
+                <p>Shared by: <span id="shared-by">Anonymous</span></p>
+            </div>
+            <button id="copy-code">Copy Code</button>
+        </div>
+    </div>
+
+    <div id="copy-notification">
+        <span>✓</span> Code copied to clipboard
+    </div>
+
+    <script>
+        const shareId = window.location.pathname.split('/').pop();
+        console.log(`Loading shared code with ID: ${shareId}`);
+
+        const editor = CodeMirror.fromTextArea(document.getElementById("shared-code"), {
+            lineNumbers: true,
+            readOnly: true,
+            theme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'material-darker' : 'default',
+            lineWrapping: true,
+            indentUnit: 4,
+            tabSize: 4,
+            extraKeys: {
+                "Tab": function(cm) {
+                    if (cm.somethingSelected()) {
+                        cm.indentSelection("add");
+                    } else {
+                        cm.replaceSelection(Array(cm.getOption("indentUnit") + 1).join(" "), "end", "+input");
+                    }
+                }
+            }
+        });
+
+        function showError(message) {
+            editor.setValue(`Error: ${message}\n\nShare ID: ${shareId}`);
+            document.getElementById("shared-lang").textContent = "Error";
+            document.getElementById("shared-by").textContent = "System";
+        }
+
+        fetch(`/shared-data/${shareId}`)
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => {
+                        throw new Error(err.error || 'Failed to load shared code');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Received shared code data:', data);
+                if (!data.code) {
+                    throw new Error('No code content received');
+                }
+
+                editor.setValue(data.code);
+                
+                let mode;
+                switch(data.lang) {
+                    case 'Python': mode = 'python'; break;
+                    case 'Java': mode = 'text/x-java'; break;
+                    case 'C': mode = 'text/x-csrc'; break;
+                    case 'Cpp': mode = 'text/x-c++src'; break;
+                    default: mode = '';
+                }
+                
+                if (mode) editor.setOption("mode", mode);
+
+                document.getElementById("shared-lang").textContent = data.lang || 'Unknown';
+                document.getElementById("shared-by").textContent = data.name || 'Anonymous';
+                
+                setTimeout(() => editor.refresh(), 100);
+            })
+            .catch(error => {
+                console.error('Error loading shared code:', error);
+                showError(error.message);
+            });
+
+        document.getElementById("copy-code").addEventListener('click', () => {
+            navigator.clipboard.writeText(editor.getValue())
+                .then(() => {
+                    const notification = document.getElementById('copy-notification');
+                    notification.style.display = 'flex';
+                    setTimeout(() => notification.style.display = 'none', 2000);
+                })
+                .catch(err => {
+                    console.error('Failed to copy code:', err);
+                    alert('Failed to copy code to clipboard');
+                });
+        });
+
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+        const updateTheme = (e) => {
+            editor.setOption("theme", e.matches ? 'material-darker' : 'default');
+        };
+        prefersDark.addListener(updateTheme);
+        updateTheme(prefersDark);
+    </script>
+</body>
+</html>

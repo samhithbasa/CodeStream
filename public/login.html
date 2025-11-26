@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login Form</title>
+  <link rel="stylesheet" href="css/login.css">
+  <script src="https://cdn.jsdelivr.net/npm/js-cookie@3.0.1/dist/js.cookie.min.js"></script>
+</head>
+
+<body>
+  <div class="login-container">
+    <h2>Login</h2>
+
+    <!-- Regular login form -->
+    <form id="loginForm">
+      <input type="email" id="email" name="email" placeholder="Email" required>
+      <input type="password" id="password" name="password" placeholder="Password" required>
+      <button type="submit">Login</button>
+    </form>
+
+    <div class="divider">
+      <span class="divider-text">OR</span>
+    </div>
+
+    <!-- 🔹 Google OAuth Redirect Button -->
+    <button id="googleLoginBtn" class="google-btn">
+      <img src="../images/goggle.png" alt="Google Logo">
+      Sign in with Google
+    </button>
+
+
+    <div class="auth-links">
+      <a href="#" id="forgotPassword">Forgot Password?</a>
+      <div class="register-link">
+        Don't have an account? <a href="/register.html" id="dont">Register here</a>
+      </div>
+    </div>
+
+    <div id="message" class="message"></div>
+  </div>
+
+  <script>
+    // Redirect to backend Google OAuth route
+    document.getElementById("googleLoginBtn").addEventListener("click", function () {
+      window.location.href = "/auth/google";
+    });
+
+    function showMessage(msg, type) {
+      const messageBox = document.getElementById('message');
+      messageBox.textContent = msg;
+      messageBox.className = 'message ' + type;
+    }
+  </script>
+  <script src="js/login.js"></script>
+</body>
+
+</html>

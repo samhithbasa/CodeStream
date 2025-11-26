@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register</title>
+    <link rel="stylesheet" href="css/register.css">
+</head>
+
+<body>
+    <div class="container">
+        <h2>Register</h2>
+        <form id="registerForm">
+            <input type="email" name="email" id="email" placeholder="Email" required>
+            <input type="password" name="emailPassword" id="emailPassword"
+                placeholder="Email Password (for verification)" required>
+            <input type="password" name="loginPassword" id="loginPassword"
+                placeholder="Login Password (min 8 characters)" required>
+
+            <div id="otpSection" style="display: none;">
+                <input type="text" id="otp" placeholder="Enter OTP" required maxlength="6">
+                <div id="otpTimer" class="otp-timer"></div>
+                <div id="resendOtp" class="resend-otp">Resend OTP</div>
+                <button type="button" id="verifyOtp">Verify OTP</button>
+            </div>
+
+            <button type="button" id="getOtp">Get OTP</button>
+        </form>
+        <div id="message" class="message"></div>
+        <div class="login-link">
+            Already have an account? <a href="/login.html">Login here</a>
+        </div>
+    </div>
+    <script src="js/register.js"></script>
+</body>
+
+</html>

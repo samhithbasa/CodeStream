@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Help Center | CodeEditor</title>
+    <link rel="stylesheet" href="css/help.css">
+</head>
+<body>
+    <div class="help-container">
+        <h1>Help Center</h1>
+        
+        <div class="search-box">
+            <input type="text" id="help-search" placeholder="Search help articles...">
+            <button onclick="searchHelp()" aria-label="Search help article">Search</button>
+        </div>
+        
+        <div class="help-sections">
+            <section class="help-category">
+                <h2>Getting Started</h2>
+                <ul>
+                    <li><a href="#create-account">How to create an account</a></li>
+                    <li><a href="#navigate-editor">Navigating the editor</a></li>
+                    <li><a href="#first-program">Your first program</a></li>
+                </ul>
+            </section>
+            
+            <section class="help-category">
+                <h2>Editor Features</h2>
+                <ul>
+                    <li><a href="#language-support">Using different programming languages</a></li>
+                    <li><a href="#saving-code">Saving and organizing your code</a></li>
+                    <li><a href="#sharing-projects">Sharing your projects</a></li>
+                </ul>
+            </section>
+            
+            <section class="help-category">
+                <h2>Troubleshooting</h2>
+                <ul>
+                    <li><a href="#error-messages">Common error messages</a></li>
+                    <li><a href="#code-errors">Code not running properly</a></li>
+                    <li><a href="#login-problems">Login issues</a></li>
+                </ul>
+            </section>
+            
+            <section class="help-category">
+                <h2>Account Management</h2>
+                <ul>
+                    <li><a href="#update-profile">Updating your profile</a></li>
+                    <li><a href="#change-password">Changing your password</a></li>
+                    <li><a href="#delete-account">Deleting your account</a></li>
+                </ul>
+            </section>
+        </div>
+        
+        <!-- Detailed Help Articles -->
+        <div class="help-articles">
+            <!-- Getting Started Articles -->
+            <article id="create-account" class="help-article">
+                <h3>How to Create an Account</h3>
+                <ol>
+                    <li>Click on the "Sign Up" button in the top right corner</li>
+                    <li>Enter your email address and choose a strong password</li>
+                    <li>Verify your email address by entering the OTP sent to your inbox</li>
+                    <li>Complete your profile setup (optional)</li>
+                    <li>Start coding immediately!</li>
+                </ol>
+                <p><strong>Note:</strong> If you don't receive the OTP, check your spam folder or request a new one.</p>
+            </article>
+            
+            <article id="navigate-editor" class="help-article">
+                <h3>Navigating the Editor</h3>
+                <p>The editor interface consists of three main sections:</p>
+                <ul>
+                    <li><strong>Code Area:</strong> Where you write your programs</li>
+                    <li><strong>Language Selector:</strong> Icons to switch between C, C++, Java, Python</li>
+                    <li><strong>Input/Output Panel:</strong> Bottom section for program input and output</li>
+                </ul>
+                <p>Use the toolbar buttons to:
+                    <button class="demo-btn">Run</button>
+                    <button class="demo-btn">Save</button>
+                    <button class="demo-btn">Share</button>
+                </p>
+            </article>
+            
+            <article id="first-program" class="help-article">
+                <h3>Your First Program</h3>
+                <p>Let's create a simple "Hello World" program:</p>
+                <pre><code>#include &lt;stdio.h&gt;
+    int main() {
+        printf("Hello, World!");
+        return 0;
+    }</code></pre>
+                <ol>
+                    <li>Select C language from the icons</li>
+                    <li>Type or paste the code above</li>
+                    <li>Click "Run" to execute</li>
+                    <li>See the output in the bottom panel</li>
+                </ol>
+            </article>
+            
+            <!-- Editor Features Articles -->
+            <article id="language-support" class="help-article">
+                <h3>Using Different Programming Languages</h3>
+                <p>We support multiple languages with syntax highlighting:</p>
+                <table class="lang-table">
+                    <tr>
+                        <th>Language</th>
+                        <th>Icon</th>
+                        <th>File Extension</th>
+                    </tr>
+                    <tr>
+                        <td>C</td>
+                        <td><img src="images/c.png" class="lang-icon" alt="C Language icon"></td>
+                        <td>.c</td>
+                    </tr>
+                    <tr>
+                        <td>C++</td>
+                        <td><img src="images/c++.png" class="lang-icon" alt="C++ Language icon"></td>
+                        <td>.cpp</td>
+                    </tr>
+                    <tr>
+                        <td>Java</td>
+                        <td><img src="images/java.png" class="lang-icon" alt="Java Language icon"></td>
+                        <td>.java</td>
+                    </tr>
+                    <tr>
+                        <td>Python</td>
+                        <td><img src="images/python.png" class="lang-icon" alt="Python Language icon"></td>
+                        <td>.py</td>
+                    </tr>
+                </table>
+            </article>
+            
+            <article id="saving-code" class="help-article">
+                <h3>Saving and Organizing Your Code</h3>
+                <p>To save your code:</p>
+                <ol>
+                    <li>Click the "Save" button</li>
+                    <li>Enter a descriptive name for your code snippet</li>
+                    <li>Click "Confirm"</li>
+                </ol>
+                <p>To access saved codes:</p>
+                <ol>
+                    <li>Click the "Saved Codes" button</li>
+                    <li>Browse your list of saved programs</li>
+                    <li>Click any item to load it into the editor</li>
+                </ol>
+            </article>
+            
+            <article id="sharing-projects" class="help-article">
+                <h3>Sharing Your Projects</h3>
+                <p>Share your code with others in 3 easy steps:</p>
+                <ol>
+                    <li>Save your code if you haven't already</li>
+                    <li>Click the "Share" button next to the saved code</li>
+                    <li>Copy the generated link and send it to anyone</li>
+                </ol>
+                <p><strong>Note:</strong> Shared links are public - anyone with the link can view your code.</p>
+            </article>
+            
+            <!-- Troubleshooting Articles -->
+            <article id="error-messages" class="help-article">
+                <h3>Common Error Messages</h3>
+                <div class="error-item">
+                    <h4>"Compilation Error"</h4>
+                    <p>This means your code has syntax errors. Check for:</p>
+                    <ul>
+                        <li>Missing semicolons</li>
+                        <li>Unmatched brackets</li>
+                        <li>Typos in keywords</li>
+                    </ul>
+                </div>
+                <div class="error-item">
+                    <h4>"Timeout Error"</h4>
+                    <p>Your code took too long to execute. Try:</p>
+                    <ul>
+                        <li>Optimizing loops</li>
+                        <li>Removing infinite loops</li>
+                        <li>Reducing complex calculations</li>
+                    </ul>
+                </div>
+            </article>
+            
+            <article id="code-errors" class="help-article">
+                <h3>Code Not Running Properly</h3>
+                <p>If your code runs but doesn't produce expected results:</p>
+                <ol>
+                    <li>Check your logic for errors</li>
+                    <li>Add print statements to debug</li>
+                    <li>Compare with working examples</li>
+                    <li>Try smaller test cases</li>
+                </ol>
+                <p>For language-specific help, refer to documentation:</p>
+                <div class="doc-links">
+                    <a href="https://devdocs.io/c/" target="_blank">C Documentation</a>
+                    <a href="https://devdocs.io/cpp/" target="_blank">C++ Documentation</a>
+                    <a href="https://devdocs.io/java/" target="_blank">Java Documentation</a>
+                    <a href="https://devdocs.io/python~3.9/" target="_blank">Python Documentation</a>
+                </div>
+            </article>
+            
+            <article id="login-problems" class="help-article">
+                <h3>Login Issues</h3>
+                <p>Having trouble logging in? Try these solutions:</p>
+                <div class="solution">
+                    <h4>Forgot Password</h4>
+                    <ol>
+                        <li>Go to the login page</li>
+                        <li>Click "Forgot Password"</li>
+                        <li>Enter your registered email</li>
+                        <li>Check your inbox for reset instructions</li>
+                    </ol>
+                </div>
+                <div class="solution">
+                    <h4>Account Locked</h4>
+                    <p>After 5 failed attempts, your account locks for 15 minutes.</p>
+                    <p>Wait or contact support if this happens accidentally.</p>
+                </div>
+            </article>
+            
+            <!-- Account Management Articles -->
+            <article id="update-profile" class="help-article">
+                <h3>Updating Your Profile</h3>
+                <p>To update your account information:</p>
+                <ol>
+                    <li>Click your profile picture in the top right</li>
+                    <li>Select "Account Settings"</li>
+                    <li>Update your email, name, or other details</li>
+                    <li>Click "Save Changes"</li>
+                </ol>
+                <p><strong>Note:</strong> Changing your email requires verification.</p>
+            </article>
+            
+            <article id="change-password" class="help-article">
+                <h3>Changing Your Password</h3>
+                <p>You can change your password two ways:</p>
+                <div class="method">
+                    <h4>When Logged In</h4>
+                    <ol>
+                        <li>Go to Account Settings</li>
+                        <li>Select "Security"</li>
+                        <li>Enter current and new password</li>
+                        <li>Confirm changes</li>
+                    </ol>
+                </div>
+                <div class="method">
+                    <h4>Password Reset</h4>
+                    <ol>
+                        <li>From login page, click "Forgot Password"</li>
+                        <li>Follow emailed instructions</li>
+                        <li>Create a new strong password</li>
+                    </ol>
+                </div>
+            </article>
+            
+            <article id="delete-account" class="help-article">
+                <h3>Deleting Your Account</h3>
+                <p>To permanently delete your account:</p>
+                <ol>
+                    <li>Go to Account Settings</li>
+                    <li>Scroll to "Delete Account"</li>
+                    <li>Read the warning carefully</li>
+                    <li>Enter your password to confirm</li>
+                    <li>Click "Permanently Delete"</li>
+                </ol>
+                <div class="warning">
+                    <span class="material-symbols-outlined">warning</span>
+                    <p>This action cannot be undone. All your saved code will be permanently deleted.</p>
+                </div>
+            </article>
+        </div>
+        
+        <div class="contact-prompt">
+            <p>Can't find what you're looking for? <a href="/contact">Contact our support team</a></p>
+        </div>
+    </div>
+    
+    <script>
+        // Smooth scrolling for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function(e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+    
+        // Search functionality
+        function searchHelp() {
+            const searchTerm = document.getElementById('help-search').value.toLowerCase();
+            const articles = document.querySelectorAll('.help-article');
+            let found = false;
+            
+            articles.forEach(article => {
+                const text = article.textContent.toLowerCase();
+                if(text.includes(searchTerm)) {
+                    article.style.display = 'block';
+                    found = true;
+                    // Scroll to first found result
+                    if(!window.location.hash) {
+                        article.scrollIntoView({ behavior: 'smooth' });
+                    }
+                } else {
+                    article.style.display = 'none';
+                }
+            });
+            
+            if(!found) {
+                alert('No articles found matching your search.');
+                articles.forEach(article => article.style.display = 'block');
+            }
+        }
+    
+        // Show relevant article if hash exists in URL
+        window.addEventListener('load', function() {
+            if(window.location.hash) {
+                const article = document.querySelector(window.location.hash);
+                if(article) {
+                    article.scrollIntoView();
+                }
+            }
+        });
+    </script>
+</body>
+</html>

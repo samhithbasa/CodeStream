@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frontend Development</title>
+    <link rel="stylesheet" href="/css/frontend_editor.css">
+    <script src="https://cdn.jsdelivr.net/npm/js-cookie@3.0.5/dist/js.cookie.min.js"></script>
+</head>
+
+<body>
+    <header class="frontend-header">
+        <div class="header-left">
+            <h1>🚀 Frontend Playground</h1>
+        </div>
+        <div class="header-right">
+            <input type="text" id="project-name" placeholder="Project Name">
+            <button id="save-project" class="btn btn-primary">
+                💾 Save & Deploy
+            </button>
+            <button id="show-projects" class="btn btn-secondary">My Projects</button>
+            <button id="logout-btn" class="btn btn-logout">Logout</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="editor-panel">
+            <div class="editor-tabs">
+                <button class="tab-btn active" data-tab="html">HTML</button>
+                <button class="tab-btn" data-tab="css">CSS</button>
+                <button class="tab-btn" data-tab="js">JavaScript</button>
+                <button class="tab-btn" data-tab="preview">Preview</button>
+            </div>
+
+            <div class="editor-content">
+                <div class="tab-content active" id="html-tab">
+                    <textarea id="html-editor" placeholder="Write your HTML here...">&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+    &lt;title&gt;My Project&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;h1&gt;Hello World!&lt;/h1&gt;
+    &lt;p&gt;Start building your amazing project...&lt;/p&gt;
+    &lt;button onclick="showAlert()"&gt;Click Me!&lt;/button&gt;
+&lt;/body&gt;
+&lt;/html&gt;</textarea>
+                </div>
+
+                <div class="tab-content" id="css-tab">
+                    <textarea id="css-editor" placeholder="Write your CSS here...">body {
+    font-family: Arial, sans-serif;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    min-height: 100vh;
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: 30px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+button {
+    background: #ff6b6b;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 25px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.3s ease;
+}
+
+button:hover {
+    background: #ff5252;
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+}</textarea>
+                </div>
+
+                <div class="tab-content" id="js-tab">
+                    <textarea id="js-editor" placeholder="Write your JavaScript here...">function showAlert() {
+    alert('Hello from JavaScript! 🎉');
+    
+    // Create a new element
+    const newElement = document.createElement('div');
+    newElement.innerHTML = '&lt;h3&gt;Dynamic Content!&lt;/h3&gt;&lt;p&gt;This was added by JavaScript.&lt;/p&gt;';
+    newElement.style.background = 'rgba(255,255,255,0.1)';
+    newElement.style.padding = '20px';
+    newElement.style.borderRadius = '10px';
+    newElement.style.marginTop = '20px';
+    
+    document.body.appendChild(newElement);
+}
+
+// Add some interactive features
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Frontend playground loaded!');
+});</textarea>
+                </div>
+
+                <div class="tab-content" id="preview-tab">
+                    <iframe id="preview-frame"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Projects Modal -->
+    <div id="projects-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>My Projects</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="projects-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Notification -->
+    <div id="success-notification" class="notification">
+        <span>✓</span> Project saved successfully! Share URL copied to clipboard.
+    </div>
+
+    <!-- Token Handler Script -->
+    <!-- Debug Token Handler Script -->
+    <script>
+        console.log('=== DEBUG: Token handler script loaded ===');
+
+        // Function to show editor selection popup
+        function showEditorSelectionPopup() {
+            console.log('DEBUG: showEditorSelectionPopup called');
+
+            // Create a beautiful popup
+            const popupOverlay = document.createElement('div');
+            popupOverlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+        backdrop-filter: blur(10px);
+    `;
+
+            const popupContent = document.createElement('div');
+            popupContent.style.cssText = `
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 40px;
+        border-radius: 20px;
+        text-align: center;
+        color: white;
+        max-width: 500px;
+        width: 90%;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    `;
+
+            popupContent.innerHTML = `
+        <h2 style="margin-bottom: 10px; font-size: 2rem;">🎉 Welcome!</h2>
+        <p style="margin-bottom: 30px; opacity: 0.9;">Would you like to switch to Code Editor?</p>
+        
+        <div style="display: flex; gap: 15px; justify-content: center;">
+            <button id="stay-here" style="background: rgba(255, 255, 255, 0.2); color: white; border: 1px solid rgba(255, 255, 255, 0.3); padding: 12px 30px; border-radius: 25px; cursor: pointer; font-size: 1rem;">Stay Here</button>
+            <button id="go-to-editor" style="background: rgba(255, 255, 255, 0.9); color: #667eea; border: none; padding: 12px 30px; border-radius: 25px; cursor: pointer; font-size: 1rem; font-weight: bold;">Go to Code Editor</button>
+        </div>
+    `;
+
+            popupOverlay.appendChild(popupContent);
+            document.body.appendChild(popupOverlay);
+
+            // Add event listeners
+            document.getElementById('stay-here').addEventListener('click', function () {
+                console.log('DEBUG: User chose to stay on Frontend Playground');
+                document.body.removeChild(popupOverlay);
+            });
+
+            document.getElementById('go-to-editor').addEventListener('click', function () {
+                console.log('DEBUG: User chose to go to Code Editor');
+                window.location.href = '/editor';
+            });
+
+            // Close on overlay click
+            popupOverlay.addEventListener('click', function (e) {
+                if (e.target === popupOverlay) {
+                    console.log('DEBUG: Popup closed by overlay click');
+                    document.body.removeChild(popupOverlay);
+                }
+            });
+        }
+
+        // Handle token from Google OAuth
+        document.addEventListener('DOMContentLoaded', function () {
+            console.log('DEBUG: DOMContentLoaded fired');
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const token = urlParams.get('token');
+            const freshLogin = sessionStorage.getItem('fresh_login');
+
+            console.log('DEBUG: URL Params:', {
+                token: token ? 'EXISTS' : 'MISSING',
+                freshLogin: freshLogin,
+                fullURL: window.location.href
+            });
+
+            if (token) {
+                console.log('DEBUG: Token found in URL:', token.substring(0, 20) + '...');
+
+                if (!freshLogin) {
+                    console.log('DEBUG: First time login, processing token...');
+
+                    // Store token in cookies
+                    Cookies.set('token', token, {
+                        expires: 7,
+                        path: '/',
+                        secure: true,
+                        sameSite: 'strict'
+                    });
+                    console.log('DEBUG: Token stored in cookies');
+
+                    // Mark as processed
+                    sessionStorage.setItem('fresh_login', 'true');
+                    console.log('DEBUG: fresh_login set in sessionStorage');
+
+                    // Clean URL
+                    const cleanURL = window.location.pathname;
+                    window.history.replaceState({}, document.title, cleanURL);
+                    console.log('DEBUG: URL cleaned to:', cleanURL);
+
+                    // Show popup after a short delay to ensure page is ready
+                    setTimeout(() => {
+                        console.log('DEBUG: Showing selection popup');
+                        showEditorSelectionPopup();
+                    }, 500);
+
+                } else {
+                    console.log('DEBUG: Already processed this login, skipping popup');
+                }
+            } else {
+                console.log('DEBUG: No token found in URL');
+            }
+        });
+
+        // Also check on page load (in case DOMContentLoaded already fired)
+        console.log('DEBUG: Script execution completed');
+        if (document.readyState === 'loading') {
+            console.log('DEBUG: Document still loading, waiting for DOMContentLoaded');
+        } else {
+            console.log('DEBUG: Document already ready, checking for token immediately');
+            const urlParams = new URLSearchParams(window.location.search);
+            const token = urlParams.get('token');
+            if (token && !sessionStorage.getItem('fresh_login')) {
+                console.log('DEBUG: Immediate token check - token found');
+                // Process immediately
+                Cookies.set('token', token, { expires: 7, path: '/' });
+                sessionStorage.setItem('fresh_login', 'true');
+                window.history.replaceState({}, document.title, window.location.pathname);
+                setTimeout(() => showEditorSelectionPopup(), 500);
+            }
+        }
+    </script>
+
+    <!-- Make sure this matches your actual filename -->
+    <script src="/js/frontend_editor.js"></script>
+</body>
+
+</html>

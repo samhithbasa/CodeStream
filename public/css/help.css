@@ -1,0 +1,191 @@
+/* General Styles */
+body {
+    margin: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #fff;
+    background: url('../images/main.jpg') no-repeat center center fixed;
+    background-size: cover;
+    backdrop-filter: blur(3px);
+}
+
+.help-container {
+    background-color: rgba(0, 0, 0, 0.75);
+    max-width: 1000px;
+    margin: 40px auto;
+    padding: 30px;
+    border-radius: 16px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.6);
+}
+
+/* Titles */
+h1 {
+    text-align: center;
+    font-size: 2.5rem;
+    margin-bottom: 30px;
+    color: #ffd700;
+}
+
+h2 {
+    color: #ffa500;
+    margin-top: 30px;
+}
+
+h3, h4 {
+    color: #ffcc70;
+}
+
+/* Search */
+.search-box {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 30px;
+}
+
+.search-box input {
+    padding: 10px;
+    width: 60%;
+    border: none;
+    border-radius: 8px 0 0 8px;
+    outline: none;
+    font-size: 1rem;
+}
+
+.search-box button {
+    padding: 10px 20px;
+    border: none;
+    background-color: #ffa500;
+    color: #000;
+    font-weight: bold;
+    border-radius: 0 8px 8px 0;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.search-box button:hover {
+    background-color: #ff8c00;
+}
+
+/* Help Sections */
+.help-category ul {
+    list-style: none;
+    padding-left: 0;
+}
+
+.help-category li {
+    margin: 8px 0;
+}
+
+.help-category a {
+    text-decoration: none;
+    color: #87cefa;
+    transition: color 0.2s ease;
+}
+
+.help-category a:hover {
+    color: #00bfff;
+}
+
+/* Help Articles */
+.help-article {
+    margin-top: 40px;
+    padding: 20px;
+    background-color: rgba(255, 255, 255, 0.05);
+    border-left: 4px solid #ffa500;
+    border-radius: 8px;
+}
+
+.help-article pre {
+    background-color: #1e1e1e;
+    color: #00ff90;
+    padding: 12px;
+    overflow-x: auto;
+    border-radius: 6px;
+}
+
+/* Tables */
+.lang-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+.lang-table th, .lang-table td {
+    padding: 10px;
+    text-align: center;
+    border: 1px solid #555;
+}
+
+.lang-icon {
+    height: 24px;
+}
+
+/* Buttons */
+.demo-btn {
+    background-color: #00bfff;
+    color: #fff;
+    border: none;
+    padding: 6px 12px;
+    margin-right: 5px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background 0.2s ease;
+}
+
+.demo-btn:hover {
+    background-color: #009acd;
+}
+
+/* Error and Warning */
+.error-item, .solution, .method {
+    margin-top: 20px;
+    background-color: rgba(255, 0, 0, 0.1);
+    padding: 15px;
+    border-left: 4px solid red;
+    border-radius: 6px;
+}
+
+.warning {
+    margin-top: 20px;
+    background-color: rgba(255, 255, 0, 0.1);
+    border-left: 4px solid yellow;
+    padding: 15px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Documentation Links */
+.doc-links a {
+    margin-right: 15px;
+    color: #00bfff;
+    text-decoration: none;
+}
+
+/* Contact Prompt */
+.contact-prompt {
+    text-align: center;
+    margin-top: 40px;
+}
+
+.contact-prompt a {
+    color: #87cefa;
+    font-weight: bold;
+}
+
+@media (max-width: 768px) {
+    .help-container {
+        padding: 20px;
+    }
+
+    .search-box {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .search-box input, .search-box button {
+        width: 100%;
+        border-radius: 8px;
+    }
+}

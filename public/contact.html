@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Contact Us | CodeEditor</title>
+    <link rel="stylesheet" href="css/contact.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <style>
+    
+        .contact-container {
+            backdrop-filter: blur(8px);
+            background: rgba(255, 255, 255, 0.1) !important;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .contact-card,
+        .contact-form {
+            background: rgba(255, 255, 255, 0.85) !important;
+            backdrop-filter: blur(5px);
+        }
+
+        body {
+            color: #fff;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="contact-container">
+        <header class="contact-header">
+            <h1>Get in Touch</h1>
+            <p class="subtitle">We'd love to hear from you. Reach out for support, partnerships, or just to say hello.
+            </p>
+        </header>
+
+        <div class="contact-methods">
+            <div class="contact-card">
+                <div class="card-icon">
+                    <i class="fas fa-envelope"></i>
+                </div>
+                <h3>Email Us</h3>
+                <p><a
+                        href="mailto:samhith_basa@srmap.edu.in?subject=Support%20Request&body=Please%20describe%20your%20issue%20here...">samhith_basa@srmap.edu.in</a>
+                </p>
+                <p class="response-time">Typically responds within 24 hours</p>
+            </div>
+
+            <div class="contact-card">
+                <div class="card-icon">
+                    <i class="fas fa-users"></i>
+                </div>
+                <h3>Community Forum</h3>
+                <p><a href="https://github.com/yourusername/yourrepo/discussions" target="_blank" rel="noopener">GitHub
+                        Discussions</a></p>
+                <p class="response-time">Join our developer community</p>
+            </div>
+
+            <div class="contact-card">
+                <div class="card-icon">
+                    <i class="fas fa-bug"></i>
+                </div>
+                <h3>Report a Bug</h3>
+                <p><a href="https://github.com/yourusername/yourrepo/issues/new?template=bug_report.md" target="_blank"
+                        rel="noopener">GitHub Issue Tracker</a></p>
+                <p class="response-time">Open source contributions welcome</p>
+            </div>
+        </div>
+
+        <form id="contactForm" class="contact-form">
+            <h2 class="form-title">Send us a message</h2>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="name">Full Name</label>
+                    <input type="text" id="name" name="name" placeholder="John Doe" required minlength="2"
+                        maxlength="50" />
+                    <span class="error-message" id="name-error"></span>
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" placeholder="john@example.com" required />
+                    <span class="error-message" id="email-error"></span>
+                </div>
+
+                <div class="form-group">
+                    <label for="subject">Subject</label>
+                    <select id="subject" name="subject" required>
+                        <option value="" disabled selected>Select a topic</option>
+                        <option value="support">Technical Support</option>
+                        <option value="bug">Bug Report</option>
+                        <option value="feature">Feature Request</option>
+                        <option value="account">Account Help</option>
+                        <option value="business">Business Inquiry</option>
+                        <option value="other">Other</option>
+                    </select>
+                    <span class="error-message" id="subject-error"></span>
+                </div>
+
+                <div class="form-group full-width">
+                    <label for="message">Your Message</label>
+                    <textarea id="message" name="message" rows="5" placeholder="How can we help you?" required
+                        minlength="10"></textarea>
+                    <span class="error-message" id="message-error"></span>
+                </div>
+
+                <div class="form-group full-width consent-group">
+                    <input type="checkbox" id="consent-checkbox" name="consent" required />
+                    <label for="consent-checkbox">
+                        I agree to the <a href="/privacy" target="_blank">privacy policy</a> and consent to my data
+                        being processed.
+                    </label>
+                    <span class="error-message" id="consent-error"></span>
+                </div>
+
+                <div class="form-group full-width">
+                    <button type="submit" class="submit-btn" id="submitBtn">
+                        <span class="btn-text">Send Message</span>
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div id="formResponse" class="form-response"></div>
+        </form>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const contactForm = document.getElementById('contactForm');
+            const responseDiv = document.getElementById('formResponse');
+            const submitBtn = document.getElementById('submitBtn');
+
+            // Form validation
+            contactForm.addEventListener('input', function (e) {
+                const input = e.target;
+                if (input.checkValidity()) {
+                    input.classList.remove('invalid');
+                    document.getElementById(`${input.id}-error`).textContent = '';
+                }
+            });
+
+            contactForm.addEventListener('submit', async function (e) {
+                e.preventDefault();
+
+                // Validate form
+                let isValid = true;
+                const inputs = contactForm.querySelectorAll('input, select, textarea, [type="checkbox"]');
+
+                inputs.forEach(input => {
+                    if (!input.checkValidity()) {
+                        input.classList.add('invalid');
+                        const errorId = `${input.id}-error` || 'consent-error';
+                        document.getElementById(errorId).textContent = getValidationMessage(input);
+                        isValid = false;
+                    }
+                });
+
+                if (!isValid) {
+                    showResponse('Please fill out all required fields correctly.', 'error');
+                    return;
+                }
+
+                // Show loading state
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+                showResponse('Processing your request...', 'processing');
+
+                try {
+                    const formData = new FormData(contactForm);
+                    const formObject = Object.fromEntries(formData.entries());
+
+                    // Send to backend API
+                    const response = await fetch('/api/contact', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(formObject)
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.message || 'Failed to send message');
+                    }
+
+                    // Success
+                    contactForm.reset();
+                    showResponse(
+                        `Thank you! Your message has been sent successfully. Ticket ID: ${data.ticketId}`,
+                        'success'
+                    );
+
+                } catch (error) {
+                    console.error('Contact form error:', error);
+                    showResponse(
+                        `Message Failed to Send: ${error.message}. Please try again or email us directly at <a href="mailto:samhith_basa@srmap.edu.in">samhith_basa@srmap.edu.in</a>`,
+                        'error'
+                    );
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<span class="btn-text">Send Message</span><i class="fas fa-paper-plane"></i>';
+                }
+            });
+
+            function getValidationMessage(input) {
+                if (input.validity.valueMissing) {
+                    return 'This field is required';
+                }
+                if (input.validity.typeMismatch) {
+                    return 'Please enter a valid email address';
+                }
+                if (input.validity.tooShort) {
+                    return `Minimum ${input.minLength} characters required`;
+                }
+                return 'Invalid input';
+            }
+
+            function showResponse(message, type) {
+                const icon = type === 'success' ? 'fa-check-circle' :
+                    type === 'error' ? 'fa-exclamation-circle' : 'fa-spinner fa-spin';
+
+                responseDiv.innerHTML = `
+            <div class="response-content">
+                <i class="fas ${icon}"></i>
+                <div>${message}</div>
+            </div>
+        `;
+                responseDiv.className = `form-response ${type}`;
+                responseDiv.style.display = 'flex';
+                responseDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        });
+    </script>
+</body>
+
+</html>
