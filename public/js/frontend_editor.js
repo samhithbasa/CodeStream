@@ -485,33 +485,76 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     updatePreview() {
-        const htmlFiles = this.files.html;
-        const cssFiles = this.files.css;
-        const jsFiles = this.files.js;
+    const htmlFiles = this.files.html;
+    const cssFiles = this.files.css;
+    const jsFiles = this.files.js;
 
-        // Combine all files of each type
-        const combinedHTML = htmlFiles.map(file => file.content).join('\n');
-        const combinedCSS = cssFiles.map(file => file.content).join('\n');
-        const combinedJS = jsFiles.map(file => file.content).join('\n');
+    // Combine all files of each type
+    const combinedHTML = htmlFiles.map(file => file.content).join('\n');
+    const combinedCSS = cssFiles.map(file => file.content).join('\n');
+    const combinedJS = jsFiles.map(file => file.content).join('\n');
 
-        const previewFrame = document.getElementById('preview-frame');
-        const previewDocument = previewFrame.contentDocument || previewFrame.contentWindow.document;
+    const previewFrame = document.getElementById('preview-frame');
+    const previewDocument = previewFrame.contentDocument || previewFrame.contentWindow.document;
 
-        previewDocument.open();
-        previewDocument.write(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <style>${combinedCSS}</style>
-            </head>
-            <body>
-                ${combinedHTML}
-                <script>${combinedJS}<\/script>
-            </body>
-            </html>
-        `);
-        previewDocument.close();
-    }
+    // Create asset mapping for local preview
+    const assetUrls = {};
+    this.files.assets.forEach(asset => {
+        assetUrls[asset.name] = asset.url;
+    });
+
+    previewDocument.open();
+    previewDocument.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>${combinedCSS}</style>
+            <script>
+                // Make assets available in preview
+                window.previewAssets = ${JSON.stringify(assetUrls)};
+                
+                // Helper function to get asset URLs
+                function getAssetUrl(filename) {
+                    return window.previewAssets[filename] || filename;
+                }
+            </script>
+        </head>
+        <body>
+            ${combinedHTML}
+            <script>
+                // Override console.log to see errors in parent
+                const originalLog = console.log;
+                const originalError = console.error;
+                
+                console.log = function(...args) {
+                    originalLog.apply(console, args);
+                    window.parent.postMessage({ type: 'console', method: 'log', args: args }, '*');
+                };
+                
+                console.error = function(...args) {
+                    originalError.apply(console, args);
+                    window.parent.postMessage({ type: 'console', method: 'error', args: args }, '*');
+                };
+                
+                // Catch and display errors
+                window.addEventListener('error', function(e) {
+                    console.error('Preview Error:', e.error);
+                });
+                
+                ${combinedJS}
+            </script>
+        </body>
+        </html>
+    `);
+    previewDocument.close();
+    
+    // Listen for console messages from preview
+    window.addEventListener('message', (event) => {
+        if (event.data.type === 'console') {
+            console[event.data.method](...event.data.args);
+        }
+    });
+}
 
     async saveProject() {
         const token = Cookies.get('token');

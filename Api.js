@@ -1194,12 +1194,16 @@ document.addEventListener('DOMContentLoaded', function() {
 });`;
 }
 
+// Serve frontend project assets
 app.get('/api/frontend/assets/:projectId/:fileName', (req, res) => {
     try {
         const { projectId, fileName } = req.params;
         const assetPath = path.join(FRONTEND_STORAGE_DIR, 'assets', projectId, fileName);
         
+        console.log('🔍 Looking for asset:', assetPath);
+        
         if (!fs.existsSync(assetPath)) {
+            console.log('❌ Asset not found:', assetPath);
             return res.status(404).json({ error: 'Asset not found' });
         }
 
@@ -1215,9 +1219,10 @@ app.get('/api/frontend/assets/:projectId/:fileName', (req, res) => {
         };
 
         res.setHeader('Content-Type', contentTypes[ext] || 'application/octet-stream');
+        console.log('✅ Serving asset:', fileName);
         res.sendFile(assetPath);
     } catch (error) {
-        console.error('Error serving asset:', error);
+        console.error('❌ Error serving asset:', error);
         res.status(500).json({ error: 'Failed to serve asset' });
     }
 });
@@ -1266,6 +1271,12 @@ app.get('/frontend/:id', (req, res) => {
         const combinedCSS = projectData.files.css.map(file => file.content).join('\n');
         const combinedJS = projectData.files.js.map(file => file.content).join('\n');
 
+        // Create asset mapping for the preview
+        const assetUrls = {};
+        projectData.files.assets.forEach(asset => {
+            assetUrls[asset.name] = `/api/frontend/assets/${projectId}/${asset.fileName}`;
+        });
+
         const htmlContent = `
 <!DOCTYPE html>
 <html lang="en">
@@ -1274,6 +1285,10 @@ app.get('/frontend/:id', (req, res) => {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${projectData.name}</title>
     <style>${combinedCSS}</style>
+    <script>
+        // Inject asset URLs into the preview
+        window.projectAssets = ${JSON.stringify(assetUrls)};
+    </script>
 </head>
 <body>
     ${combinedHTML}
