@@ -41,15 +41,12 @@ class EnhancedFrontendEditor {
         try {
             const savedAssets = localStorage.getItem('frontendEditor_assets');
             if (savedAssets) {
-                this.assets = JSON.parse(savedAssets);
-                console.log('Loaded assets from localStorage:', this.assets.length, this.assets.map(a => a.name));
-
-                // Update assets manager if it's open
-                if (document.getElementById('assets-modal') && document.getElementById('assets-modal').style.display === 'block') {
-                    this.renderAssetsList();
-                }
-            } else {
-                console.log('No assets found in localStorage');
+                const parsed = JSON.parse(savedAssets);
+                // Filter out any corrupted assets
+                this.assets = Array.isArray(parsed) ? parsed.filter(asset => 
+                    asset && asset.name && asset.data
+                ) : [];
+                console.log('Loaded assets from localStorage:', this.assets.length);
             }
         } catch (error) {
             console.warn('Could not load assets from localStorage:', error);
@@ -620,101 +617,187 @@ class EnhancedFrontendEditor {
         const fullHTML = this.generateFullHTML();
         const frame = document.getElementById('preview-frame');
         if (!frame) return;
-        const doc = frame.contentDocument || frame.contentWindow.document;
-
-        // Clear previous content and write new content
-        doc.open();
-        doc.write(fullHTML);
-        doc.close();
-
-        // Handle frame events (best-effort)
-        frame.onload = () => {
-            console.log('Preview frame loaded successfully');
-        };
-
-        frame.onerror = (error) => {
-            console.error('Preview frame error:', error);
-        };
+        
+        try {
+            const doc = frame.contentDocument || frame.contentWindow.document;
+            doc.open();
+            doc.write(fullHTML);
+            doc.close();
+            
+            // Add error handling for frame
+            frame.onload = () => {
+                console.log('Preview frame loaded successfully');
+            };
+            
+            frame.onerror = (error) => {
+                console.error('Preview frame error:', error);
+                // Fallback: try to set srcdoc if write fails
+                frame.srcdoc = fullHTML;
+            };
+            
+        } catch (error) {
+            console.error('Error updating preview:', error);
+            // Fallback method
+            frame.srcdoc = fullHTML;
+        }
     }
 
     generateFullHTML() {
-        // Get the current HTML file to display
-        const currentHtmlFile = this.currentFile.html || 'index.html';
-        const mainHTML = this.files.html[currentHtmlFile] || '';
+        // Get all HTML files
+        const htmlFiles = this.files.html || {};
+        const currentHtmlFile = this.currentFile.html || Object.keys(htmlFiles)[0] || 'index.html';
+        const mainHTML = htmlFiles[currentHtmlFile] || '<h1>No content</h1>';
 
         // Combine all CSS files
         let combinedCSS = '';
         if (this.files.css) {
             Object.values(this.files.css).forEach(css => {
-                if (css) combinedCSS += css + '\n';
+                if (css && typeof css === 'string') {
+                    combinedCSS += css + '\n';
+                }
             });
         }
 
-        // Combine all JS files
+        // Combine all JS files safely
         let combinedJS = '';
         if (this.files.js) {
             Object.values(this.files.js).forEach(js => {
-                if (js) combinedJS += js + '\n';
+                if (js && typeof js === 'string') {
+                    // Properly escape JavaScript content
+                    const safeJS = js
+                        .replace(/<\/script>/gi, '<\\/script>')
+                        .replace(/`/g, '\\`')
+                        .replace(/\${/g, '\\${');
+                    combinedJS += safeJS + '\n';
+                }
             });
         }
+
+        const projectName = document.getElementById('project-name')?.value || 'My Project';
+        const allHtmlFiles = Object.keys(htmlFiles);
 
         return `<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${document.getElementById('project-name').value || 'My Project'}</title>
+    <title>${projectName}</title>
     <style>
-        ${combinedCSS}
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: white;
+            color: #333;
+        }
         
-        /* Multi-page navigation styles */
-        .page-navigation {
-            background: #f5f5f5;
-            padding: 10px;
-            border-bottom: 1px solid #ddd;
-            margin-bottom: 20px;
+        /* Navigation styles */
+        .project-navigation {
+            background: #2c3e50;
+            padding: 15px;
+            margin: -20px -20px 20px -20px;
         }
-        .page-nav-button {
-            margin: 0 5px;
-            padding: 5px 10px;
-            background: #007bff;
+        .nav-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .nav-btn {
+            background: #34495e;
             color: white;
-            border: none;
-            border-radius: 3px;
+            border: 1px solid #4a6278;
+            padding: 8px 16px;
+            border-radius: 4px;
             cursor: pointer;
+            text-decoration: none;
         }
-        .page-nav-button:hover {
-            background: #0056b3;
+        .nav-btn:hover {
+            background: #4a6278;
         }
+        .nav-btn.active {
+            background: #3498db;
+            border-color: #2980b9;
+        }
+        
+        ${combinedCSS}
     </style>
 </head>
 <body>
-    <!-- Page Navigation -->
-    <div class="page-navigation" id="page-navigation">
-        <strong>Pages:</strong>
-        ${Object.keys(this.files.html).map(page =>
-            `<button class="page-nav-button" onclick="switchPage('${page}')">${page}</button>`
-        ).join('')}
+    <!-- Multi-page Navigation -->
+    ${allHtmlFiles.length > 1 ? `
+    <nav class="project-navigation">
+        <div class="nav-buttons">
+            ${allHtmlFiles.map(page => 
+                `<button class="nav-btn ${page === currentHtmlFile ? 'active' : ''}" 
+                        onclick="window.loadPage('${page}')">
+                    ${page.replace('.html', '')}
+                </button>`
+            ).join('')}
+        </div>
+    </nav>
+    ` : ''}
+    
+    <div id="content">
+        ${mainHTML}
     </div>
-    
-    ${mainHTML}
-    
+
     <script>
+        // Project data
+        const projectPages = ${JSON.stringify(htmlFiles)};
+        const projectAssets = ${JSON.stringify(this.assets || [])};
+        const currentProject = '${projectName}';
+
         // Multi-page navigation function
-        function switchPage(pageName) {
-            // This would need to communicate with the parent editor
-            // For now, we'll just show an alert
-            alert('Switch to: ' + pageName + '\\nIn the editor, use the file tree to switch between pages.');
+        function loadPage(pageName) {
+            console.log('Loading page:', pageName);
+            
+            if (projectPages[pageName]) {
+                // Process the HTML for the new page
+                let pageHTML = projectPages[pageName]
+                    .replace(/<link[^>]*href=["'][^"']*\\.css["'][^>]*>/gi, '')
+                    .replace(/<script[^>]*src=["'][^"']*\\.js["'][^>]*><\\/script>/gi, '');
+                
+                document.getElementById('content').innerHTML = pageHTML;
+                
+                // Update active navigation button
+                document.querySelectorAll('.nav-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                event.target.classList.add('active');
+                
+                console.log('Page loaded successfully:', pageName);
+            } else {
+                console.error('Page not found:', pageName);
+                document.getElementById('content').innerHTML = 
+                    '<h1>Page Not Found</h1><p>The page "' + pageName + '" was not found in this project.</p>';
+            }
         }
+
+        // Make loadPage available globally
+        window.loadPage = loadPage;
+        window.projectPages = projectPages;
+        window.projectAssets = projectAssets;
+
+        // Safe script execution with error handling
+        (function() {
+            try {
+                ${combinedJS}
+            } catch (error) {
+                console.error('Script execution error in project:', error);
+            }
+        })();
+
+        // Project info for debugging
+        console.log('Project "' + currentProject + '" loaded successfully');
+        console.log('Pages available:', ${allHtmlFiles.length});
+        console.log('Assets:', ${(this.assets || []).length});
+        console.log('All pages:', ${JSON.stringify(allHtmlFiles)});
         
-        // Make assets available to JavaScript
-        window.projectAssets = ${JSON.stringify(this.assets)};
-        ${combinedJS}
-        
-        // Debug info
-        console.log('Project loaded: ${document.getElementById('project-name').value || 'My Project'}');
-        console.log('Assets count: ${this.assets.length}');
-        console.log('Available pages:', ${JSON.stringify(Object.keys(this.files.html))});
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM fully loaded and parsed');
+        });
     </script>
 </body>
 </html>`;
@@ -895,24 +978,31 @@ class EnhancedFrontendEditor {
 
     async showProjects() {
         const token = Cookies.get('token');
-        if (!token) return alert("Please login");
-
+        
         try {
+            const headers = {};
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
             const res = await fetch('/api/frontend/projects', {
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: headers
             });
 
-            if (!res.ok) throw new Error("Failed to load");
+            if (!res.ok) {
+                throw new Error(`Failed to load projects: ${res.status}`);
+            }
 
             const projects = await res.json();
+            console.log('Loaded projects:', projects);
             this.displayProjects(projects);
 
             const projectsModal = document.getElementById('projects-modal');
             if (projectsModal) projectsModal.style.display = 'block';
 
         } catch (err) {
-            console.error(err);
-            alert("Error loading projects");
+            console.error('Error loading projects:', err);
+            alert("Error loading projects: " + err.message);
         }
     }
 
@@ -921,28 +1011,30 @@ class EnhancedFrontendEditor {
         if (!list) return;
 
         if (!projects || projects.length === 0) {
-            list.innerHTML = `<p style="text-align:center;padding:20px;">No projects found.</p>`;
+            list.innerHTML = `<p style="text-align:center;padding:20px;color:#666;">No projects found. Create your first project!</p>`;
             return;
         }
 
         list.innerHTML = projects.map(p => `
             <div class="project-item">
                 <div class="project-info">
-                    <h3>${this.escapeHtml(p.name)}</h3>
-                    <p><strong>Created:</strong> ${new Date(p.createdAt).toLocaleDateString()} • 
-                       <strong>Updated:</strong> ${new Date(p.updatedAt).toLocaleDateString()}</p>
-
+                    <h3>${this.escapeHtml(p.name || 'Untitled Project')}</h3>
+                    <p class="project-meta">
+                        <strong>Created:</strong> ${new Date(p.createdAt || Date.now()).toLocaleDateString()} • 
+                        <strong>Files:</strong> ${p.fileCount || 0} • 
+                        <strong>Assets:</strong> ${p.assetCount || 0}
+                    </p>
                     <div class="project-link-container">
-                        <span>Share Link:</span>
+                        <span class="project-link-label">Share Link:</span>
                         <div class="link-copy-group">
-                            <input value="${p.shareUrl}" readonly>
-                            <button onclick="navigator.clipboard.writeText('${p.shareUrl}')">📋 Copy</button>
+                            <input type="text" class="project-link-input" value="${p.shareUrl || ''}" readonly>
+                            <button class="btn btn-small" onclick="navigator.clipboard.writeText('${p.shareUrl || ''}')">📋 Copy</button>
                         </div>
                     </div>
                 </div>
                 <div class="project-actions">
-                    <button onclick="frontendEditor.openProject('${p.id}')">Open</button>
-                    <button onclick="frontendEditor.deleteProject('${p.id}','${p.name}')">Delete</button>
+                    <button class="btn btn-open" onclick="frontendEditor.openProject('${p.id}')">Open</button>
+                    <button class="btn btn-delete" onclick="frontendEditor.deleteProject('${p.id}','${p.name || 'Untitled'}')">Delete</button>
                 </div>
             </div>
         `).join('');
@@ -1046,12 +1138,33 @@ class EnhancedFrontendEditor {
         if (projectsModal) projectsModal.style.display = 'none';
     }
 
-    eescapeHtml(str) {
-        return str.replace(/&/g, "&amp;")
+    escapeHtml(str) {
+        if (!str) return '';
+        return str.toString()
+            .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;")
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&#039;");
+    }
+
+    // Debug method for testing
+    async debugProjectSystem() {
+        console.log('=== PROJECT SYSTEM DEBUG ===');
+        
+        // Test API connectivity
+        try {
+            const response = await fetch('/api/frontend/projects');
+            const projects = await response.json();
+            console.log('API Response:', projects);
+        } catch (error) {
+            console.error('API Error:', error);
+        }
+        
+        // Test local storage
+        console.log('Local Storage Assets:', localStorage.getItem('frontendEditor_assets'));
+        console.log('Current Files:', this.files);
+        console.log('Current Assets:', this.assets);
     }
 }
 

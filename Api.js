@@ -1071,6 +1071,12 @@ app.get('/api/frontend/health', (req, res) => {
 app.get('/api/frontend/project/:id', async (req, res) => {
     try {
         const projectId = req.params.id;
+
+        // Safety check for invalid project IDs
+        if (!projectId || projectId.includes('..') || projectId.endsWith('.js') || projectId.endsWith('.css') || projectId.endsWith('.html')) {
+            return res.status(400).json({ error: 'Invalid project ID' });
+        }
+
         const projectPath = path.join(FRONTEND_STORAGE_DIR, `${projectId}.json`);
 
         if (!fs.existsSync(projectPath)) {
