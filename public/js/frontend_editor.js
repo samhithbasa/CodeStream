@@ -18,12 +18,48 @@ class EnhancedFrontendEditor {
         this.init();
     }
 
+    saveAssetsToLocalStorage() {
+        try {
+            localStorage.setItem('frontendEditor_assets', JSON.stringify(this.assets));
+        } catch (error) {
+            console.warn('Could not save assets to localStorage:', error);
+        }
+    }
+
+    loadAssetsFromLocalStorage() {
+        try {
+            const savedAssets = localStorage.getItem('frontendEditor_assets');
+            if (savedAssets) {
+                this.assets = JSON.parse(savedAssets);
+                console.log('Loaded assets from localStorage:', this.assets.length, this.assets.map(a => a.name));
+
+                // Update assets manager if it's open
+                if (document.getElementById('assets-modal').style.display === 'block') {
+                    this.renderAssetsList();
+                }
+            } else {
+                console.log('No assets found in localStorage');
+            }
+        } catch (error) {
+            console.warn('Could not load assets from localStorage:', error);
+            this.assets = []; // Reset to empty array on error
+        }
+    }
+
     init() {
         this.bindEvents();
         this.updateFileTree();
+        this.loadAssetsFromLocalStorage(); // Load assets first
         this.updatePreview();
-        this.checkAuthStatus();     // NEW
+        this.checkAuthStatus();
         this.setupAutoSave();
+
+        // ✅ Ensure assets are displayed if assets manager is open
+        setTimeout(() => {
+            if (document.getElementById('assets-modal').style.display === 'block') {
+                this.renderAssetsList();
+            }
+        }, 100);
     }
 
     /* ----------------------------------------------------
@@ -386,7 +422,9 @@ class EnhancedFrontendEditor {
 
     showAssetsManager() {
         document.getElementById('assets-modal').style.display = 'block';
+        // ✅ Ensure we're showing the current state
         this.renderAssetsList();
+        console.log('Assets manager opened. Current assets:', this.assets.length);
     }
 
     handleAssetUpload(e) {
@@ -400,30 +438,50 @@ class EnhancedFrontendEditor {
                     size: file.size,
                     uploadedAt: new Date()
                 });
+
+                // ✅ CRITICAL: Save assets to localStorage immediately after upload
+                this.saveAssetsToLocalStorage();
                 this.renderAssetsList();
+
+                console.log('Asset uploaded and saved to localStorage:', file.name);
             };
             reader.readAsDataURL(file);
         });
+
+        // Clear the file input
+        e.target.value = '';
     }
 
     renderAssetsList() {
-        const list = document.getElementById('assets-list');
-        list.innerHTML = '';
+        const assetsList = document.getElementById('assets-list');
+        assetsList.innerHTML = '';
 
-        this.assets.forEach((asset, i) => {
-            const div = document.createElement('div');
-            div.className = 'asset-item';
-            const preview = asset.type.startsWith("image/")
-                ? `<img src="${asset.data}">`
-                : `<div style="font-size:2rem;">📄</div>`;
-            div.innerHTML = `
-                ${preview}
-                <div class="asset-name">${asset.name}</div>
-                <div class="asset-actions">
-                    <button onclick="frontendEditor.copyAssetUrl('${asset.name}')">📋</button>
-                    <button onclick="frontendEditor.deleteAsset(${i})">🗑️</button>
-                </div>`;
-            list.appendChild(div);
+        if (this.assets.length === 0) {
+            assetsList.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">No assets uploaded</p>';
+            return;
+        }
+
+        this.assets.forEach((asset, index) => {
+            const assetItem = document.createElement('div');
+            assetItem.className = 'asset-item';
+
+            let preview = '';
+            if (asset.type.startsWith('image/')) {
+                preview = `<img src="${asset.data}" alt="${asset.name}" style="max-width: 100%; max-height: 60px; object-fit: contain;">`;
+            } else {
+                preview = `<div style="font-size: 2rem;">📄</div>`;
+            }
+
+            assetItem.innerHTML = `
+            ${preview}
+            <div class="asset-name" title="${asset.name}">${asset.name.length > 15 ? asset.name.substring(0, 15) + '...' : asset.name}</div>
+            <div class="asset-actions">
+                <button onclick="frontendEditor.copyAssetUrl('${asset.name}')" title="Copy URL">📋</button>
+                <button onclick="frontendEditor.deleteAsset(${index})" title="Delete">🗑️</button>
+            </div>
+        `;
+
+            assetsList.appendChild(assetItem);
         });
     }
 
@@ -437,6 +495,8 @@ class EnhancedFrontendEditor {
     deleteAsset(i) {
         if (confirm("Delete asset?")) {
             this.assets.splice(i, 1);
+            // ✅ CRITICAL: Save to localStorage after deletion
+            this.saveAssetsToLocalStorage();
             this.renderAssetsList();
         }
     }
@@ -452,49 +512,82 @@ class EnhancedFrontendEditor {
     }
 
     generateFullHTML() {
-        let html = Object.values(this.files.html).join('\n');
-        let css = Object.values(this.files.css).join('\n');
-        let js = Object.values(this.files.js).join('\n');
+        // Combine all HTML files
+        let combinedHTML = '';
+        if (this.files.html) {
+            Object.values(this.files.html).forEach(html => {
+                if (html) combinedHTML += html + '\n';
+            });
+        }
 
-        const assets = this.assets
-            .map(a => a.type.startsWith("image/") ? `<link rel="preload" href="${a.data}" as="image">` : '')
-            .join("");
+        // Combine all CSS files
+        let combinedCSS = '';
+        if (this.files.css) {
+            Object.values(this.files.css).forEach(css => {
+                if (css) combinedCSS += css + '\n';
+            });
+        }
 
-        const title = document.getElementById('project-name').value || "My Project";
+        // Combine all JS files
+        let combinedJS = '';
+        if (this.files.js) {
+            Object.values(this.files.js).forEach(js => {
+                if (js) combinedJS += js + '\n';
+            });
+        }
 
-        return `
-<!DOCTYPE html>
+        // Generate proper asset references - FIXED
+        const assetLinks = this.assets.map(asset => {
+            if (asset.type && asset.type.startsWith('image/')) {
+                // For images, create proper img tags or background references
+                return ``; // We'll handle images in the HTML/CSS directly
+            }
+            return '';
+        }).join('\n');
+
+        // Create base HTML with proper asset handling
+        let baseHTML = `<!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<title>${title}</title>
-<style>${css}</style>
-${assets}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${document.getElementById('project-name').value || 'My Project'}</title>
+    <style>
+        ${combinedCSS}
+        
+        /* Inject asset styles */
+        ${this.assets.map(asset => {
+            if (asset.type && asset.type.startsWith('image/')) {
+                // Create CSS classes for images
+                return `
+                .asset-${asset.name.replace(/[^a-zA-Z0-9]/g, '-')} {
+                    background-image: url("${asset.data}");
+                }`;
+            }
+            return '';
+        }).join('\n')}
+    </style>
 </head>
 <body>
-${html}
-<script>${js}</script>
+    ${combinedHTML}
+    
+    <!-- Inject asset elements -->
+    ${this.assets.map(asset => {
+            if (asset.type && asset.type.startsWith('image/')) {
+                return `<img src="${asset.data}" alt="${asset.name}" style="max-width: 100%; height: auto;">`;
+            }
+            return '';
+        }).join('\n')}
+    
+    <script>
+        // Make assets available to JavaScript
+        window.projectAssets = ${JSON.stringify(this.assets)};
+        ${combinedJS}
+    </script>
 </body>
 </html>`;
-    }
 
-    setPreviewSize(size) {
-        const tab = document.getElementById('preview-tab');
-        tab.className = `tab-content active preview-${size}`;
-        this.updatePreview();
-    }
-
-    toggleFullscreenPreview() {
-        const tab = document.getElementById('preview-tab');
-        const btn = document.getElementById('fullscreen-preview');
-
-        if (tab.classList.contains('preview-fullscreen')) {
-            tab.classList.remove('preview-fullscreen');
-            btn.textContent = '📺 Fullscreen';
-        } else {
-            tab.classList.add('preview-fullscreen');
-            btn.textContent = '📺 Exit Fullscreen';
-        }
+        return baseHTML;
     }
 
     /* ---------------------------------------------
@@ -503,47 +596,70 @@ ${html}
 
     async saveProject() {
         const token = Cookies.get('token');
-        if (!token) return alert("Please login to save!");
+        if (!token) {
+            alert('Please login to save your project');
+            return;
+        }
 
-        const btn = document.getElementById('save-project');
-        const old = btn.innerHTML;
-        btn.innerHTML = "💾 Saving...";
-        btn.disabled = true;
+        const saveBtn = document.getElementById('save-project');
+        const originalText = saveBtn.innerHTML;
 
-        const name = document.getElementById('project-name').value.trim() || "Untitled Project";
+        // Add saving state
+        saveBtn.innerHTML = '💾 Saving...';
+        saveBtn.classList.add('saving');
+        saveBtn.disabled = true;
+
+        const projectName = document.getElementById('project-name').value.trim() || 'Untitled Project';
 
         try {
-            const res = await fetch('/api/frontend/save', {
-                method: "POST",
+            // Ensure all current file content is saved before sending
+            this.saveCurrentFile('html', document.getElementById('html-editor').value);
+            this.saveCurrentFile('css', document.getElementById('css-editor').value);
+            this.saveCurrentFile('js', document.getElementById('js-editor').value);
+
+            const response = await fetch('/api/frontend/save', {
+                method: 'POST',
                 headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({
-                    name,
+                    name: projectName,
                     files: this.files,
-                    assets: this.assets,
+                    assets: this.assets, // ✅ Make sure assets are included
                     structure: this.getProjectStructure()
                 })
             });
 
-            const result = await res.json();
+            const result = await response.json();
 
             if (result.success) {
                 this.showSuccessNotification(result.shareUrl);
-                btn.innerHTML = "✅ Saved!";
-                setTimeout(() => (btn.innerHTML = old), 2000);
-            } else {
-                alert(result.error);
-                btn.innerHTML = old;
-            }
-        } catch (err) {
-            console.error(err);
-            alert("Error saving project");
-            btn.innerHTML = old;
-        }
+                saveBtn.innerHTML = '✅ Saved!';
+                setTimeout(() => {
+                    saveBtn.innerHTML = originalText;
+                }, 2000);
 
-        btn.disabled = false;
+                console.log('Project saved with assets:', {
+                    projectId: result.projectId,
+                    assetsCount: this.assets.length,
+                    assets: this.assets.map(a => a.name)
+                });
+            } else {
+                alert('Failed to save project: ' + result.error);
+                saveBtn.innerHTML = originalText;
+            }
+        } catch (error) {
+            console.error('Error saving project:', error);
+            alert('Error saving project. Please try again.');
+            saveBtn.innerHTML = '❌ Failed';
+            setTimeout(() => {
+                saveBtn.innerHTML = originalText;
+            }, 2000);
+        } finally {
+            saveBtn.classList.remove('saving');
+            saveBtn.disabled = false;
+        }
     }
 
     getProjectStructure() {
@@ -616,27 +732,69 @@ ${html}
         `).join('');
     }
 
-    async openProject(id) {
+    debugAssets() {
+        console.log('=== ASSETS DEBUG INFO ===');
+        console.log('Current assets array:', this.assets);
+        console.log('Assets length:', this.assets.length);
+        console.log('LocalStorage assets:', localStorage.getItem('frontendEditor_assets'));
+        console.log('Assets in DOM:', document.querySelectorAll('.asset-item').length);
+        console.log('========================');
+    }
+
+    async openProject(projectId) {
         try {
-            const response = await fetch(`/api/frontend/project/${id}`);
+            const response = await fetch(`/api/frontend/project/${projectId}`);
+            if (!response.ok) {
+                throw new Error('Failed to load project');
+            }
+
             const project = await response.json();
 
-            this.files = project.files;
-            this.assets = project.assets || [];
-
+            // Load project metadata
             document.getElementById('project-name').value = project.name;
 
-            this.updateFileTree();
-            this.openFile('html', Object.keys(this.files.html)[0]);
+            // Load files structure
+            if (project.files) {
+                this.files = project.files;
+                this.updateFileTree();
 
+                // Set current files
+                if (project.files.html && Object.keys(project.files.html).length > 0) {
+                    this.currentFile.html = Object.keys(project.files.html)[0];
+                    this.loadFileContent('html', this.currentFile.html);
+                }
+
+                if (project.files.css && Object.keys(project.files.css).length > 0) {
+                    this.currentFile.css = Object.keys(project.files.css)[0];
+                    this.loadFileContent('css', this.currentFile.css);
+                }
+
+                if (project.files.js && Object.keys(project.files.js).length > 0) {
+                    this.currentFile.js = Object.keys(project.files.js)[0];
+                    this.loadFileContent('js', this.currentFile.js);
+                }
+            }
+
+            // ✅ CRITICAL: Load assets and save to localStorage
+            if (project.assets && Array.isArray(project.assets)) {
+                this.assets = project.assets;
+                // Save loaded assets to localStorage
+                this.saveAssetsToLocalStorage();
+                console.log('Loaded assets from project:', this.assets.length, this.assets.map(a => a.name));
+            } else {
+                this.assets = [];
+                this.saveAssetsToLocalStorage();
+                console.log('No assets found in project');
+            }
+
+            this.hideModal();
             this.updatePreview();
+            this.updateFileSelectors();
             this.switchTab('preview');
 
-            document.getElementById('projects-modal').style.display = 'none';
-
-        } catch (err) {
-            console.error(err);
-            alert("Error opening project");
+        } catch (error) {
+            console.error('Error opening project:', error);
+            alert('Error opening project. Please try again.');
         }
     }
 
@@ -665,12 +823,14 @@ ${html}
 
     escapeHtml(str) {
         return str.replace(/&/g, "&amp;")
-                  .replace(/</g, "&lt;")
-                  .replace(/>/g, "&gt;")
-                  .replace(/"/g, "&quot;")
-                  .replace(/'/g, "&#039;");
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
     }
 }
+
+
 
 /* ----------------------------------------------------
    BOOT EDITOR

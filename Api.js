@@ -958,6 +958,8 @@ app.delete('/delete-code/:id', authenticateToken, (req, res) => {
     }
 });
 
+
+
 app.post('/api/frontend/save', authenticateToken, async (req, res) => {
     try {
         const { name, files, assets, structure } = req.body;
@@ -991,6 +993,80 @@ app.post('/api/frontend/save', authenticateToken, async (req, res) => {
     }
 });
 
+// Route to migrate legacy projects to have user IDs
+app.post('/api/frontend/migrate-projects', authenticateToken, async (req, res) => {
+    try {
+        const files = fs.readdirSync(FRONTEND_STORAGE_DIR);
+        let migratedCount = 0;
+
+        files.filter(file => file.endsWith('.json')).forEach(file => {
+            try {
+                const filePath = path.join(FRONTEND_STORAGE_DIR, file);
+                const projectData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                
+                // If project has no userId, add it
+                if (!projectData.userId) {
+                    projectData.userId = req.user.userId;
+                    projectData.userEmail = req.user.email;
+                    projectData.updatedAt = new Date();
+                    
+                    fs.writeFileSync(filePath, JSON.stringify(projectData, null, 2));
+                    migratedCount++;
+                    console.log(`Migrated project: ${projectData.name}`);
+                }
+            } catch (error) {
+                console.error(`Error migrating project file ${file}:`, error);
+            }
+        });
+
+        res.json({
+            success: true,
+            message: `Migrated ${migratedCount} projects`,
+            migratedCount: migratedCount
+        });
+    } catch (error) {
+        console.error('Error migrating projects:', error);
+        res.status(500).json({ error: 'Failed to migrate projects' });
+    }
+});
+
+// Health check for frontend projects
+app.get('/api/frontend/health', (req, res) => {
+    try {
+        const files = fs.readdirSync(FRONTEND_STORAGE_DIR);
+        const jsonFiles = files.filter(file => file.endsWith('.json'));
+        
+        const projects = jsonFiles.map(file => {
+            try {
+                const filePath = path.join(FRONTEND_STORAGE_DIR, file);
+                const projectData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                return {
+                    id: projectData.id,
+                    name: projectData.name,
+                    hasFiles: !!projectData.files,
+                    hasAssets: !!(projectData.assets && projectData.assets.length > 0),
+                    fileSize: fs.statSync(filePath).size,
+                    isValid: true
+                };
+            } catch (error) {
+                return { fileName: file, isValid: false, error: error.message };
+            }
+        });
+
+        res.json({
+            status: 'healthy',
+            totalProjects: jsonFiles.length,
+            storagePath: FRONTEND_STORAGE_DIR,
+            projects: projects
+        });
+    } catch (error) {
+        res.status(500).json({ 
+            status: 'error', 
+            error: error.message 
+        });
+    }
+});
+
 app.get('/api/frontend/project/:id', authenticateToken, async (req, res) => {
     try {
         const projectId = req.params.id;
@@ -1001,9 +1077,12 @@ app.get('/api/frontend/project/:id', authenticateToken, async (req, res) => {
         }
 
         const projectData = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
-        
-        // Check if user owns this project
-        if (projectData.userId !== req.user.userId) {
+
+        // ✅ IMPROVED: Handle projects without user IDs (legacy projects)
+        if (!projectData.userId) {
+            console.log(`[DEBUG] Project ${projectId} has no userId, allowing access`);
+            // Allow access to legacy projects without user IDs
+        } else if (projectData.userId !== req.user.userId) {
             return res.status(403).json({ error: 'Access denied' });
         }
 
@@ -1016,7 +1095,7 @@ app.get('/api/frontend/project/:id', authenticateToken, async (req, res) => {
 
 function generateDeployedHTML(projectData) {
     const { files, assets } = projectData;
-    
+
     // Add null checks and safe property access
     let combinedCSS = '';
     if (files && files.css) {
@@ -1035,15 +1114,16 @@ function generateDeployedHTML(projectData) {
     // Get main HTML (use index.html or first HTML file)
     let mainHTML = '';
     if (files && files.html) {
-        mainHTML = files.html['index.html'] || 
-                  (Object.values(files.html).length > 0 ? Object.values(files.html)[0] : '') || 
-                  '<h1>Project loaded successfully!</h1>';
+        mainHTML = files.html['index.html'] ||
+            (Object.values(files.html).length > 0 ? Object.values(files.html)[0] : '') ||
+            '<h1>Project loaded successfully!</h1>';
     }
 
-    // Generate asset links with proper null checks
-    const assetLinks = (assets || []).map(asset => {
+    // ✅ IMPROVED: Better asset handling with fallbacks
+    const assetElements = (assets || []).map(asset => {
         if (asset && asset.type && asset.type.startsWith('image/') && asset.data) {
-            return `<link rel="preload" href="${asset.data}" as="image">`;
+            // For deployed projects, use the base64 data directly
+            return `<img src="${asset.data}" alt="${asset.name}" class="asset-image" style="max-width: 100%; height: auto; display: block; margin: 10px 0;">`;
         }
         return '';
     }).join('\n');
@@ -1054,12 +1134,50 @@ function generateDeployedHTML(projectData) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${projectData.name || 'My Project'}</title>
-    <style>${combinedCSS}</style>
-    ${assetLinks}
+    <style>
+        ${combinedCSS}
+        
+        /* Asset styles for deployed project */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+            background: white;
+            color: #333;
+        }
+        
+        .asset-image {
+            max-width: 100%;
+            height: auto;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        /* Ensure images don't overflow */
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
 </head>
 <body>
     ${mainHTML}
-    <script>${combinedJS}</script>
+    
+    <!-- Asset elements -->
+    ${assetElements}
+    
+    <script>
+        // Make assets available in deployed project
+        const projectAssets = ${JSON.stringify(assets || [])};
+        ${combinedJS}
+        
+        // Debug info in console
+        console.log('Project loaded:', '${projectData.name || 'Untitled'}');
+        console.log('Assets count:', ${(assets || []).length});
+    </script>
 </body>
 </html>`;
 }
@@ -1067,6 +1185,13 @@ function generateDeployedHTML(projectData) {
 app.get('/frontend/:id', (req, res) => {
     try {
         const projectId = req.params.id;
+
+        // Safety check: if it looks like a filename, return 404 immediately
+        if (projectId.endsWith('.js') || projectId.endsWith('.css') || projectId.endsWith('.html')) {
+            console.log(`[DEBUG] Invalid project ID (looks like filename): ${projectId}`);
+            return res.status(404).send('Project not found. Invalid project ID.');
+        }
+
         const projectPath = path.join(FRONTEND_STORAGE_DIR, `${projectId}.json`);
 
         console.log(`[DEBUG] Loading project: ${projectId}`);
@@ -1086,10 +1211,10 @@ app.get('/frontend/:id', (req, res) => {
         });
 
         const htmlContent = generateDeployedHTML(projectData);
-        
+
         console.log(`[DEBUG] Generated HTML content length: ${htmlContent.length}`);
         res.send(htmlContent);
-        
+
     } catch (error) {
         console.error('Error serving frontend project:', error);
         console.error('Error stack:', error.stack);
@@ -1109,16 +1234,20 @@ app.get('/api/frontend/projects', authenticateToken, async (req, res) => {
                 const filePath = path.join(FRONTEND_STORAGE_DIR, file);
                 const projectData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
                 
-                // Only include projects owned by the user
-                if (projectData.userId === req.user.userId) {
+                // ✅ IMPROVED: Handle both new and legacy projects
+                const isUserProject = !projectData.userId || projectData.userId === req.user.userId;
+                
+                if (isUserProject) {
                     userProjects.push({
                         id: projectData.id,
                         name: projectData.name,
                         createdAt: projectData.createdAt,
                         updatedAt: projectData.updatedAt,
                         shareUrl: `https://memory-update-production.up.railway.app/frontend/${projectData.id}`,
-                        fileCount: Object.keys(projectData.files || {}).reduce((acc, key) => acc + Object.keys(projectData.files[key] || {}).length, 0),
-                        assetCount: (projectData.assets || []).length
+                        fileCount: Object.keys(projectData.files || {}).reduce((acc, key) => 
+                            acc + Object.keys(projectData.files[key] || {}).length, 0),
+                        assetCount: (projectData.assets || []).length,
+                        isLegacy: !projectData.userId // Flag for legacy projects
                     });
                 }
             } catch (error) {
@@ -1146,9 +1275,9 @@ app.delete('/api/frontend/project/:id', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'Project not found' });
         }
 
-        // Verify ownership
+        // Verify ownership with legacy project support
         const projectData = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
-        if (projectData.userId !== req.user.userId) {
+        if (projectData.userId && projectData.userId !== req.user.userId) {
             return res.status(403).json({ error: 'Access denied' });
         }
 
@@ -1163,6 +1292,40 @@ app.delete('/api/frontend/project/:id', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Error deleting project:', error);
         res.status(500).json({ error: 'Failed to delete project' });
+    }
+});
+
+// Add this debug route to list all projects
+app.get('/api/debug/projects', (req, res) => {
+    try {
+        const files = fs.readdirSync(FRONTEND_STORAGE_DIR);
+        const projects = files
+            .filter(file => file.endsWith('.json'))
+            .map(file => {
+                try {
+                    const filePath = path.join(FRONTEND_STORAGE_DIR, file);
+                    const projectData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                    return {
+                        id: projectData.id,
+                        name: projectData.name,
+                        fileName: file,
+                        files: projectData.files ? Object.keys(projectData.files) : 'No files',
+                        assets: projectData.assets ? projectData.assets.length : 0,
+                        userId: projectData.userId || 'No user ID'
+                    };
+                } catch (error) {
+                    return { fileName: file, error: error.message };
+                }
+            });
+
+        res.json({
+            totalProjects: projects.length,
+            storagePath: FRONTEND_STORAGE_DIR,
+            projects: projects
+        });
+    } catch (error) {
+        console.error('Error listing projects:', error);
+        res.status(500).json({ error: error.message });
     }
 });
 
@@ -1523,7 +1686,7 @@ wss.on('connection', (ws) => {
                 tempFiles.push(filename);
                 console.log('📝 [DEBUG] Python file created:', filename);
 
-                command = 'python3';  
+                command = 'python3';
                 args = [filename];
                 console.log('⚙️ [DEBUG] Python execute command:', command, args);
                 break;
