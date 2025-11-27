@@ -1118,7 +1118,7 @@ function generateDeployedHTML(projectData) {
 
     // Get all HTML page names
     const pageNames = Object.keys(htmlFiles);
-
+    
     // Use index.html or first available HTML file
     let mainHTML = '';
     if (htmlFiles['index.html']) {
@@ -1129,8 +1129,29 @@ function generateDeployedHTML(projectData) {
         mainHTML = '<h1>Project loaded successfully!</h1><p>No HTML files found in this project.</p>';
     }
 
-    // Sanitize HTML content
-    const safeMainHTML = mainHTML.replace(/<\/script>/gi, '<\\/script>');
+    // Process HTML to remove external resource references and handle multi-page navigation
+    let processedHTML = mainHTML
+        // Remove external CSS links (they're included in combinedCSS)
+        .replace(/<link[^>]*href=["'][^"']*\.css["'][^>]*>/gi, '')
+        // Remove external JS scripts (they're included in combinedJS)
+        .replace(/<script[^>]*src=["'][^"']*\.js["'][^>]*><\/script>/gi, '');
+
+    // Add multi-page navigation if there are multiple HTML files
+    if (pageNames.length > 1) {
+        const navigationHTML = `
+        <nav class="project-navigation" style="background: #f5f5f5; padding: 15px; border-bottom: 2px solid #ddd; margin: -20px -20px 20px -20px;">
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                ${pageNames.map(page => 
+                    `<button onclick="loadPage('${page}')" 
+                            style="padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        ${page.replace('.html', '')}
+                    </button>`
+                ).join('')}
+            </div>
+        </nav>`;
+        
+        processedHTML = processedHTML.replace('<body>', '<body>' + navigationHTML);
+    }
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -1146,15 +1167,50 @@ function generateDeployedHTML(projectData) {
             background: white;
             color: #333;
         }
+        
+        /* Multi-page navigation styles */
+        .project-navigation {
+            background: #2c3e50 !important;
+        }
+        .project-navigation button {
+            background: #34495e !important;
+            border: 1px solid #4a6278 !important;
+        }
+        .project-navigation button:hover {
+            background: #4a6278 !important;
+        }
+        
         ${combinedCSS}
     </style>
 </head>
 <body>
     <div id="content">
-        ${safeMainHTML}
+        ${processedHTML}
     </div>
 
     <script>
+        // Multi-page functionality
+        const projectPages = ${JSON.stringify(htmlFiles)};
+        
+        function loadPage(pageName) {
+            if (projectPages[pageName]) {
+                // Process the HTML for the new page
+                let pageHTML = projectPages[pageName]
+                    .replace(/<link[^>]*href=["'][^"']*\\.css["'][^>]*>/gi, '')
+                    .replace(/<script[^>]*src=["'][^"']*\\.js["'][^>]*><\\/script>/gi, '');
+                
+                document.getElementById('content').innerHTML = pageHTML;
+                
+                // Re-initialize any scripts for the new page
+                initializePageScripts();
+            }
+        }
+        
+        function initializePageScripts() {
+            // This function would re-initialize any page-specific scripts
+            // For now, we rely on the combined JS that runs on every page
+        }
+        
         // Safe script execution with error handling
         (function() {
             try {
@@ -1173,12 +1229,11 @@ function generateDeployedHTML(projectData) {
 </html>`;
 }
 
-// Add this route to Api.js to handle CSS/JS file requests
+// Add this route to Api.js to handle individual file requests within projects
 app.get('/frontend-assets/:projectId/:filename', (req, res) => {
     try {
         const { projectId, filename } = req.params;
-
-        // Safety check
+        
         if (!projectId || !filename) {
             return res.status(400).send('Invalid request');
         }
@@ -1191,11 +1246,10 @@ app.get('/frontend-assets/:projectId/:filename', (req, res) => {
 
         const projectData = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
         const fileExt = path.extname(filename).toLowerCase();
-
-        // Determine file type and get content
+        
         let fileContent = null;
         let contentType = 'text/plain';
-
+        
         if (fileExt === '.css' && projectData.files?.css) {
             fileContent = projectData.files.css[filename];
             contentType = 'text/css';
@@ -1206,14 +1260,14 @@ app.get('/frontend-assets/:projectId/:filename', (req, res) => {
             fileContent = projectData.files.html[filename];
             contentType = 'text/html';
         }
-
+        
         if (fileContent) {
             res.setHeader('Content-Type', contentType);
             res.send(fileContent);
         } else {
             res.status(404).send('File not found in project');
         }
-
+        
     } catch (error) {
         console.error('Error serving project file:', error);
         res.status(500).send('Error loading file');
