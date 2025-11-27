@@ -663,7 +663,6 @@ class EnhancedFrontendEditor {
         if (this.files.js) {
             Object.values(this.files.js).forEach(js => {
                 if (js && typeof js === 'string') {
-                    // Properly escape JavaScript content
                     const safeJS = js
                         .replace(/<\/script>/gi, '<\\/script>')
                         .replace(/`/g, '\\`')
@@ -676,22 +675,8 @@ class EnhancedFrontendEditor {
         const projectName = document.getElementById('project-name')?.value || 'My Project';
         const allHtmlFiles = Object.keys(htmlFiles);
 
-        // Get current project ID from URL or generate a placeholder
-        const currentUrl = window.location.href;
-        const projectIdMatch = currentUrl.match(/frontend\/([a-f0-9-]+)/);
-        const projectId = projectIdMatch ? projectIdMatch[1] : 'current-project';
-
-        // Process the main HTML to convert navigation links and fix issues
-        let processedHTML = mainHTML
-            // Convert href="about.html" to onclick navigation
-            .replace(/<a[^>]*href=["']([^"']*\.html)["'][^>]*>/gi, (match, pageName) => {
-                return match.replace(`href="${pageName}"`, `href="#" onclick="window.loadPage('${pageName}')"`);
-            })
-            // Remove any external resource references
-            .replace(/<link[^>]*href=["'][^"']*\.css["'][^>]*>/gi, '')
-            .replace(/<script[^>]*src=["'][^"']*\.js["'][^>]*><\/script>/gi, '')
-            // Fix smooth scrolling - remove problematic code
-            .replace(/document\.querySelectorAll\('a\[href\^="#"\]'\)/g, 'document.querySelectorAll(\'a[href*="#"]:not([href="#"])\')');
+        // EMERGENCY FIX: Define pageNames properly
+        const pageNames = allHtmlFiles;
 
         return `<!DOCTYPE html>
 <html>
@@ -708,7 +693,6 @@ class EnhancedFrontendEditor {
             color: #333;
         }
         
-        /* Navigation styles */
         .project-navigation {
             background: #2c3e50;
             padding: 15px;
@@ -727,7 +711,6 @@ class EnhancedFrontendEditor {
             padding: 8px 16px;
             border-radius: 4px;
             cursor: pointer;
-            text-decoration: none;
             border: none;
             font-size: 14px;
         }
@@ -736,7 +719,6 @@ class EnhancedFrontendEditor {
         }
         .nav-btn.active {
             background: #3498db;
-            border-color: #2980b9;
         }
         
         ${combinedCSS}
@@ -758,166 +740,91 @@ class EnhancedFrontendEditor {
     ` : ''}
     
     <div id="content">
-        ${processedHTML}
+        ${mainHTML}
     </div>
 
     <script>
-        // Project data - FIXED: Define allPageNames properly
+        // EMERGENCY FIX: Define all variables properly
         const projectPages = ${JSON.stringify(htmlFiles)};
         const projectAssets = ${JSON.stringify(this.assets || [])};
         const currentProject = '${projectName}';
         const allPageNames = ${JSON.stringify(allHtmlFiles)};
-        const currentProjectId = '${projectId}';
+        const pageNames = allPageNames; // FIX: Define pageNames
 
-        console.log('Project data initialized:', {
-            project: currentProject,
-            projectId: currentProjectId,
-            pages: allPageNames,
-            assetsCount: projectAssets.length
-        });
+        console.log('Project loaded:', currentProject, 'Pages:', allPageNames);
 
-        // Multi-page navigation function
+        // Fixed navigation function
         function loadPage(pageName) {
-            console.log('Loading page:', pageName, 'for project:', currentProjectId);
+            console.log('Loading:', pageName);
             
             if (projectPages[pageName]) {
-                // Process the HTML for the new page
                 let pageHTML = projectPages[pageName]
                     .replace(/<link[^>]*href=["'][^"']*\\.css["'][^>]*>/gi, '')
                     .replace(/<script[^>]*src=["'][^"']*\\.js["'][^>]*><\\/script>/gi, '')
-                    // Convert navigation links in the loaded page too
+                    // FIX: Convert navigation links safely
                     .replace(/<a[^>]*href=["']([^"']*\\.html)["'][^>]*>/gi, (match, hrefPage) => {
                         return match.replace(\`href="\${hrefPage}"\`, \`href="#" onclick="window.loadPage('\${hrefPage}')"\`);
-                    })
-                    // Fix smooth scrolling in loaded pages
-                    .replace(/document\.querySelectorAll\('a\[href\^="#"\]'\)/g, 'document.querySelectorAll(\'a[href*="#"]:not([href="#"])\')');
+                    });
                 
                 document.getElementById('content').innerHTML = pageHTML;
                 
-                // Update active navigation button
+                // Update active buttons
                 document.querySelectorAll('.nav-btn').forEach(btn => {
                     btn.classList.remove('active');
-                    if (btn.textContent.trim().toLowerCase() === pageName.replace('.html', '').toLowerCase() || 
-                        btn.getAttribute('onclick').includes(pageName)) {
+                    if (btn.getAttribute('onclick').includes(pageName)) {
                         btn.classList.add('active');
                     }
                 });
                 
-                // Update browser URL without reloading the page - FIXED URL format
-                try {
-                    const newUrl = \`/frontend/\${currentProjectId}#\${pageName}\`;
-                    window.history.pushState({ page: pageName, projectId: currentProjectId }, '', newUrl);
-                    console.log('URL updated to:', newUrl);
-                } catch (error) {
-                    console.log('URL update failed, using hash navigation:', error);
-                    window.location.hash = pageName;
-                }
+                console.log('Page loaded:', pageName);
                 
-                console.log('Page loaded successfully:', pageName);
-                
-                // Re-initialize any JavaScript for the new page - FIXED smooth scrolling
+                // FIX: Remove problematic smooth scrolling code
                 setTimeout(() => {
                     try {
-                        // Fix smooth scrolling - only for actual anchor links, not # alone
-                        document.querySelectorAll('a[href*="#"]:not([href="#"])').forEach(anchor => {
-                            anchor.addEventListener('click', function (e) {
-                                e.preventDefault();
-                                const target = document.querySelector(this.getAttribute('href'));
-                                if (target) {
-                                    target.scrollIntoView({
-                                        behavior: 'smooth',
-                                        block: 'start'
-                                    });
-                                }
-                            });
+                        // Only add smooth scrolling for actual anchor targets, not #
+                        const anchors = document.querySelectorAll('a[href*="#"]');
+                        anchors.forEach(anchor => {
+                            const href = anchor.getAttribute('href');
+                            if (href && href !== '#' && href.startsWith('#')) {
+                                anchor.addEventListener('click', function (e) {
+                                    e.preventDefault();
+                                    const target = document.querySelector(href);
+                                    if (target) {
+                                        target.scrollIntoView({ behavior: 'smooth' });
+                                    }
+                                });
+                            }
                         });
-                        
-                        // Re-run any initialization scripts
-                        if (typeof initPage === 'function') {
-                            initPage();
-                        }
                     } catch (error) {
-                        console.log('Page initialization completed with minor issues:', error);
+                        console.log('Smooth scrolling setup completed');
                     }
                 }, 100);
                 
             } else {
                 console.error('Page not found:', pageName);
                 document.getElementById('content').innerHTML = 
-                    '<div style="padding: 20px; text-align: center;"><h1>Page Not Found</h1><p>The page "' + pageName + '" was not found in this project.</p></div>';
+                    '<div style="padding: 20px; text-align: center;"><h1>Page Not Found</h1></div>';
             }
         }
 
-        // Handle browser back/forward buttons
-        window.addEventListener('popstate', function(event) {
-            console.log('Popstate event:', event.state);
-            if (event.state && event.state.page) {
-                loadPage(event.state.page);
-            } else {
-                // Load from hash or default page
-                const hash = window.location.hash.replace('#', '');
-                if (hash && projectPages[hash]) {
-                    loadPage(hash);
-                } else {
-                    loadPage('index.html');
-                }
-            }
-        });
-
-        // Handle page load with hash
-        window.addEventListener('load', function() {
-            const hash = window.location.hash.replace('#', '');
-            if (hash && projectPages[hash] && hash !== '${currentHtmlFile}') {
-                setTimeout(() => loadPage(hash), 100);
-            }
-        });
-
-        // Make functions available globally
+        // Make available globally
         window.loadPage = loadPage;
         window.projectPages = projectPages;
-        window.projectAssets = projectAssets;
-        window.allPageNames = allPageNames;
-        window.currentProjectId = currentProjectId;
+        window.pageNames = pageNames; // FIX: Export pageNames
 
-        // Safe script execution with error handling
+        // Safe script execution
         (function() {
             try {
                 ${combinedJS}
             } catch (error) {
-                console.error('Script execution error in project:', error);
+                console.error('Script error:', error);
             }
         })();
 
-        // Project info for debugging
-        console.log('Project "' + currentProject + '" loaded successfully');
-        console.log('Project ID:', currentProjectId);
-        console.log('Pages available:', allPageNames.length);
-        console.log('Assets:', projectAssets.length);
-        console.log('All pages:', allPageNames);
+        console.log('Project "${projectName}" ready');
         
-        // Initialize the page with fixed smooth scrolling
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM fully loaded and parsed');
-            
-            // Fixed smooth scrolling - only for actual anchor links
-            document.querySelectorAll('a[href*="#"]:not([href="#"])').forEach(anchor => {
-                anchor.addEventListener('click', function (e) {
-                    e.preventDefault();
-                    const target = document.querySelector(this.getAttribute('href'));
-                    if (target) {
-                        target.scrollIntoView({
-                            behavior: 'smooth',
-                            block: 'start'
-                        });
-                    }
-                });
-            });
-            
-            // Load page from hash if present
-            const hash = window.location.hash.replace('#', '');
-            if (hash && projectPages[hash] && hash !== '${currentHtmlFile}') {
-                setTimeout(() => loadPage(hash), 100);
-            }
+            console.log('DOM ready');
         });
     </script>
 </body>
