@@ -720,6 +720,75 @@ class EnhancedFrontendEditor {
 </html>`;
     }
 
+    /* ----------------------------------------------------
+   PREVIEW CONTROLS - MISSING METHODS
+---------------------------------------------------- */
+
+    toggleFullscreenPreview() {
+        const previewFrame = document.getElementById('preview-frame');
+        if (!previewFrame) return;
+
+        if (!document.fullscreenElement) {
+            // Enter fullscreen
+            if (previewFrame.requestFullscreen) {
+                previewFrame.requestFullscreen();
+            } else if (previewFrame.webkitRequestFullscreen) {
+                previewFrame.webkitRequestFullscreen();
+            } else if (previewFrame.msRequestFullscreen) {
+                previewFrame.msRequestFullscreen();
+            }
+        } else {
+            // Exit fullscreen
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.msExitFullscreen) {
+                document.msExitFullscreen();
+            }
+        }
+    }
+
+    setPreviewSize(size) {
+        const previewFrame = document.getElementById('preview-frame');
+        if (!previewFrame) return;
+
+        const previewContainer = previewFrame.parentElement;
+        if (!previewContainer) return;
+
+        // Remove existing size classes
+        previewContainer.classList.remove('preview-desktop', 'preview-tablet', 'preview-mobile', 'preview-responsive');
+
+        switch (size) {
+            case 'desktop':
+                previewContainer.classList.add('preview-desktop');
+                previewFrame.style.width = '100%';
+                previewFrame.style.height = '100%';
+                break;
+            case 'tablet':
+                previewContainer.classList.add('preview-tablet');
+                previewFrame.style.width = '768px';
+                previewFrame.style.height = '1024px';
+                break;
+            case 'mobile':
+                previewContainer.classList.add('preview-mobile');
+                previewFrame.style.width = '375px';
+                previewFrame.style.height = '667px';
+                break;
+            case 'responsive':
+                previewContainer.classList.add('preview-responsive');
+                previewFrame.style.width = '100%';
+                previewFrame.style.height = '100%';
+                break;
+            default:
+                previewFrame.style.width = '100%';
+                previewFrame.style.height = '100%';
+        }
+
+        // Update preview after size change
+        setTimeout(() => this.updatePreview(), 100);
+    }
+
     /* ---------------------------------------------
        PROJECT SAVE / LOAD
     --------------------------------------------- */
@@ -977,7 +1046,7 @@ class EnhancedFrontendEditor {
         if (projectsModal) projectsModal.style.display = 'none';
     }
 
-    escapeHtml(str) {
+    eescapeHtml(str) {
         return str.replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;")

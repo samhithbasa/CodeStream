@@ -1003,13 +1003,13 @@ app.post('/api/frontend/migrate-projects', authenticateToken, async (req, res) =
             try {
                 const filePath = path.join(FRONTEND_STORAGE_DIR, file);
                 const projectData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-                
+
                 // If project has no userId, add it
                 if (!projectData.userId) {
                     projectData.userId = req.user.userId;
                     projectData.userEmail = req.user.email;
                     projectData.updatedAt = new Date();
-                    
+
                     fs.writeFileSync(filePath, JSON.stringify(projectData, null, 2));
                     migratedCount++;
                     console.log(`Migrated project: ${projectData.name}`);
@@ -1035,7 +1035,7 @@ app.get('/api/frontend/health', (req, res) => {
     try {
         const files = fs.readdirSync(FRONTEND_STORAGE_DIR);
         const jsonFiles = files.filter(file => file.endsWith('.json'));
-        
+
         const projects = jsonFiles.map(file => {
             try {
                 const filePath = path.join(FRONTEND_STORAGE_DIR, file);
@@ -1060,9 +1060,9 @@ app.get('/api/frontend/health', (req, res) => {
             projects: projects
         });
     } catch (error) {
-        res.status(500).json({ 
-            status: 'error', 
-            error: error.message 
+        res.status(500).json({
+            status: 'error',
+            error: error.message
         });
     }
 });
@@ -1106,17 +1106,19 @@ function generateDeployedHTML(projectData) {
         }
     });
 
-    // Combine ALL JS files  
+    // Combine ALL JS files safely
     let combinedJS = '';
     Object.values(jsFiles).forEach(js => {
         if (js && typeof js === 'string') {
-            combinedJS += js + '\n';
+            // Basic sanitization - remove any problematic characters
+            const safeJS = js.replace(/<\/script>/gi, '<\\/script>');
+            combinedJS += safeJS + '\n';
         }
     });
 
     // Get all HTML page names
     const pageNames = Object.keys(htmlFiles);
-    
+
     // Use index.html or first available HTML file
     let mainHTML = '';
     if (htmlFiles['index.html']) {
@@ -1127,6 +1129,9 @@ function generateDeployedHTML(projectData) {
         mainHTML = '<h1>Project loaded successfully!</h1><p>No HTML files found in this project.</p>';
     }
 
+    // Sanitize HTML content
+    const safeMainHTML = mainHTML.replace(/<\/script>/gi, '<\\/script>');
+
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1134,152 +1139,35 @@ function generateDeployedHTML(projectData) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${name || 'My Project'}</title>
     <style>
-        /* Reset and base styles */
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        
         body {
             font-family: Arial, sans-serif;
-            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
             background: white;
             color: #333;
-            padding: 0;
         }
-
-        /* Navigation styles */
-        .page-navigation {
-            background: #2c3e50;
-            padding: 15px 20px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        
-        .page-nav-list {
-            list-style: none;
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin: 0;
-            padding: 0;
-        }
-        
-        .page-nav-link {
-            color: white;
-            text-decoration: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            background: #34495e;
-            transition: background 0.3s;
-            border: 1px solid #4a6278;
-        }
-        
-        .page-nav-link:hover {
-            background: #4a6278;
-            text-decoration: none;
-        }
-        
-        .page-nav-link.current {
-            background: #3498db;
-            border-color: #2980b9;
-        }
-        
-        .content-area {
-            padding: 20px;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
         ${combinedCSS}
     </style>
 </head>
 <body>
-    <!-- Multi-page Navigation -->
-    ${pageNames.length > 1 ? `
-    <nav class="page-navigation">
-        <div style="color: white; margin-bottom: 10px; font-weight: bold;">
-            📁 Project: ${name || 'Untitled'} 
-        </div>
-        <ul class="page-nav-list">
-            ${pageNames.map(page => 
-                `<li>
-                    <a href="javascript:void(0)" 
-                       class="page-nav-link ${page === (pageNames[0]) ? 'current' : ''}" 
-                       onclick="loadPage('${page}')">
-                       ${page.replace('.html', '')}
-                    </a>
-                </li>`
-            ).join('')}
-        </ul>
-    </nav>
-    ` : ''}
-    
-    <div class="content-area" id="content">
-        ${mainHTML}
+    <div id="content">
+        ${safeMainHTML}
     </div>
 
     <script>
-        // Project data
-        const projectPages = ${JSON.stringify(htmlFiles)};
-        const projectAssets = ${JSON.stringify(assets || [])};
-        const currentProject = '${name || 'Untitled Project'}';
-
-        // Page loading function
-        function loadPage(pageName) {
-            console.log('Loading page:', pageName);
+        // Safe script execution with error handling
+        (function() {
+            try {
+                ${combinedJS}
+            } catch (error) {
+                console.error('Script execution error in project:', error);
+            }
             
-            if (projectPages[pageName]) {
-                // Update content
-                document.getElementById('content').innerHTML = projectPages[pageName];
-                
-                // Update navigation
-                document.querySelectorAll('.page-nav-link').forEach(link => {
-                    link.classList.remove('current');
-                });
-                event.target.classList.add('current');
-                
-                // Re-execute any scripts in the loaded content
-                executeScripts();
-                
-                console.log('Page loaded successfully:', pageName);
-            } else {
-                console.error('Page not found:', pageName);
-                document.getElementById('content').innerHTML = 
-                    '<h1>Page Not Found</h1><p>The requested page was not found in this project.</p>';
-            }
-        }
-
-        // Function to execute scripts in loaded content
-        function executeScripts() {
-            const scripts = document.getElementById('content').getElementsByTagName('script');
-            for (let script of scripts) {
-                try {
-                    if (script.src) {
-                        // External script - would need special handling
-                        console.log('External script found:', script.src);
-                    } else {
-                        // Inline script
-                        eval(script.innerHTML);
-                    }
-                } catch (error) {
-                    console.error('Script execution error:', error);
-                }
-            }
-        }
-
-        // Make project data available globally
-        window.projectAssets = projectAssets;
-        window.projectPages = projectPages;
-        window.loadPage = loadPage;
-
-        // Debug info
-        console.log('🚀 Project loaded:', currentProject);
-        console.log('📄 Available pages:', Object.keys(projectPages));
-        console.log('🖼️ Assets count:', projectAssets.length);
-        console.log('🔧 Project data:', { 
-            name: currentProject, 
-            pages: Object.keys(projectPages),
-            assets: projectAssets.length 
-        });
-
-        ${combinedJS}
+            // Project info for debugging
+            console.log('Project "${name || 'Untitled'}" loaded successfully');
+            console.log('Pages available: ${pageNames.length}');
+            console.log('Assets: ${assets ? assets.length : 0}');
+        })();
     </script>
 </body>
 </html>`;
@@ -1289,7 +1177,7 @@ function generateDeployedHTML(projectData) {
 app.get('/frontend-assets/:projectId/:filename', (req, res) => {
     try {
         const { projectId, filename } = req.params;
-        
+
         // Safety check
         if (!projectId || !filename) {
             return res.status(400).send('Invalid request');
@@ -1303,11 +1191,11 @@ app.get('/frontend-assets/:projectId/:filename', (req, res) => {
 
         const projectData = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
         const fileExt = path.extname(filename).toLowerCase();
-        
+
         // Determine file type and get content
         let fileContent = null;
         let contentType = 'text/plain';
-        
+
         if (fileExt === '.css' && projectData.files?.css) {
             fileContent = projectData.files.css[filename];
             contentType = 'text/css';
@@ -1318,14 +1206,14 @@ app.get('/frontend-assets/:projectId/:filename', (req, res) => {
             fileContent = projectData.files.html[filename];
             contentType = 'text/html';
         }
-        
+
         if (fileContent) {
             res.setHeader('Content-Type', contentType);
             res.send(fileContent);
         } else {
             res.status(404).send('File not found in project');
         }
-        
+
     } catch (error) {
         console.error('Error serving project file:', error);
         res.status(500).send('Error loading file');
@@ -1336,7 +1224,7 @@ app.get('/frontend-assets/:projectId/:filename', (req, res) => {
 app.get('/frontend/:projectId/:filename', (req, res) => {
     try {
         const { projectId, filename } = req.params;
-        
+
         // Safety check
         if (projectId.endsWith('.js') || projectId.endsWith('.css') || projectId.endsWith('.html')) {
             return res.status(404).send('Invalid project ID');
@@ -1349,13 +1237,13 @@ app.get('/frontend/:projectId/:filename', (req, res) => {
         }
 
         const projectData = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
-        
+
         // Check if the requested file exists in the project
         const fileExt = path.extname(filename).toLowerCase();
-        const fileType = fileExt === '.html' ? 'html' : 
-                        fileExt === '.css' ? 'css' : 
-                        fileExt === '.js' ? 'js' : null;
-        
+        const fileType = fileExt === '.html' ? 'html' :
+            fileExt === '.css' ? 'css' :
+                fileExt === '.js' ? 'js' : null;
+
         if (fileType && projectData.files && projectData.files[fileType]) {
             const fileContent = projectData.files[fileType][filename];
             if (fileContent) {
@@ -1365,14 +1253,14 @@ app.get('/frontend/:projectId/:filename', (req, res) => {
                     '.css': 'text/css',
                     '.js': 'application/javascript'
                 }[fileExt] || 'text/plain';
-                
+
                 res.setHeader('Content-Type', contentType);
                 return res.send(fileContent);
             }
         }
-        
+
         res.status(404).send('File not found in project');
-        
+
     } catch (error) {
         console.error('Error serving project file:', error);
         res.status(500).send('Error loading file');
@@ -1430,10 +1318,10 @@ app.get('/api/frontend/projects', authenticateToken, async (req, res) => {
             try {
                 const filePath = path.join(FRONTEND_STORAGE_DIR, file);
                 const projectData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-                
+
                 // ✅ IMPROVED: Handle both new and legacy projects
                 const isUserProject = !projectData.userId || projectData.userId === req.user.userId;
-                
+
                 if (isUserProject) {
                     userProjects.push({
                         id: projectData.id,
@@ -1441,7 +1329,7 @@ app.get('/api/frontend/projects', authenticateToken, async (req, res) => {
                         createdAt: projectData.createdAt,
                         updatedAt: projectData.updatedAt,
                         shareUrl: `https://memory-update-production.up.railway.app/frontend/${projectData.id}`,
-                        fileCount: Object.keys(projectData.files || {}).reduce((acc, key) => 
+                        fileCount: Object.keys(projectData.files || {}).reduce((acc, key) =>
                             acc + Object.keys(projectData.files[key] || {}).length, 0),
                         assetCount: (projectData.assets || []).length,
                         isLegacy: !projectData.userId // Flag for legacy projects
@@ -1454,7 +1342,7 @@ app.get('/api/frontend/projects', authenticateToken, async (req, res) => {
 
         // Sort by update date (newest first)
         userProjects.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-        
+
         res.json(userProjects);
     } catch (error) {
         console.error('Error loading projects:', error);
