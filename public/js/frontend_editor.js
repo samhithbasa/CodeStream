@@ -676,6 +676,11 @@ class EnhancedFrontendEditor {
         const projectName = document.getElementById('project-name')?.value || 'My Project';
         const allHtmlFiles = Object.keys(htmlFiles);
 
+        // Get current project ID from URL or generate a placeholder
+        const currentUrl = window.location.href;
+        const projectIdMatch = currentUrl.match(/frontend\/([a-f0-9-]+)/);
+        const projectId = projectIdMatch ? projectIdMatch[1] : 'current-project';
+
         // Process the main HTML to convert navigation links
         let processedHTML = mainHTML
             // Convert href="about.html" to onclick navigation
@@ -760,10 +765,11 @@ class EnhancedFrontendEditor {
         const projectAssets = ${JSON.stringify(this.assets || [])};
         const currentProject = '${projectName}';
         const allPageNames = ${JSON.stringify(allHtmlFiles)};
+        const currentProjectId = '${projectId}';
 
         // Multi-page navigation function
         function loadPage(pageName) {
-            console.log('Loading page:', pageName);
+            console.log('Loading page:', pageName, 'for project:', currentProjectId);
             
             if (projectPages[pageName]) {
                 // Process the HTML for the new page
@@ -786,6 +792,16 @@ class EnhancedFrontendEditor {
                     }
                 });
                 
+                // Update browser URL without reloading the page
+                try {
+                    const newUrl = \`/frontend/\${currentProjectId}#\${pageName}\`;
+                    window.history.pushState({ page: pageName, projectId: currentProjectId }, '', newUrl);
+                    console.log('URL updated to:', newUrl);
+                } catch (error) {
+                    console.log('URL update failed, using hash navigation:', error);
+                    window.location.hash = pageName;
+                }
+                
                 console.log('Page loaded successfully:', pageName);
                 
                 // Re-initialize any JavaScript for the new page
@@ -807,11 +823,36 @@ class EnhancedFrontendEditor {
             }
         }
 
+        // Handle browser back/forward buttons
+        window.addEventListener('popstate', function(event) {
+            console.log('Popstate event:', event.state);
+            if (event.state && event.state.page) {
+                loadPage(event.state.page);
+            } else {
+                // Load from hash or default page
+                const hash = window.location.hash.replace('#', '');
+                if (hash && projectPages[hash]) {
+                    loadPage(hash);
+                } else {
+                    loadPage('index.html');
+                }
+            }
+        });
+
+        // Handle page load with hash
+        window.addEventListener('load', function() {
+            const hash = window.location.hash.replace('#', '');
+            if (hash && projectPages[hash] && hash !== (currentHtmlFile || 'index.html')) {
+                loadPage(hash);
+            }
+        });
+
         // Make loadPage available globally
         window.loadPage = loadPage;
         window.projectPages = projectPages;
         window.projectAssets = projectAssets;
         window.allPageNames = allPageNames;
+        window.currentProjectId = currentProjectId;
 
         // Safe script execution with error handling
         (function() {
@@ -824,13 +865,21 @@ class EnhancedFrontendEditor {
 
         // Project info for debugging
         console.log('Project "' + currentProject + '" loaded successfully');
+        console.log('Project ID:', currentProjectId);
         console.log('Pages available:', allPageNames.length);
         console.log('Assets:', projectAssets.length);
         console.log('All pages:', allPageNames);
+        console.log('Current URL:', window.location.href);
         
         // Initialize the page
         document.addEventListener('DOMContentLoaded', function() {
             console.log('DOM fully loaded and parsed');
+            
+            // Load page from hash if present
+            const hash = window.location.hash.replace('#', '');
+            if (hash && projectPages[hash] && hash !== '${currentHtmlFile}') {
+                setTimeout(() => loadPage(hash), 100);
+            }
         });
     </script>
 </body>
