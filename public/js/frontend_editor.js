@@ -681,7 +681,7 @@ class EnhancedFrontendEditor {
         const projectIdMatch = currentUrl.match(/frontend\/([a-f0-9-]+)/);
         const projectId = projectIdMatch ? projectIdMatch[1] : 'current-project';
 
-        // Process the main HTML to convert navigation links
+        // Process the main HTML to convert navigation links and fix issues
         let processedHTML = mainHTML
             // Convert href="about.html" to onclick navigation
             .replace(/<a[^>]*href=["']([^"']*\.html)["'][^>]*>/gi, (match, pageName) => {
@@ -689,7 +689,9 @@ class EnhancedFrontendEditor {
             })
             // Remove any external resource references
             .replace(/<link[^>]*href=["'][^"']*\.css["'][^>]*>/gi, '')
-            .replace(/<script[^>]*src=["'][^"']*\.js["'][^>]*><\/script>/gi, '');
+            .replace(/<script[^>]*src=["'][^"']*\.js["'][^>]*><\/script>/gi, '')
+            // Fix smooth scrolling - remove problematic code
+            .replace(/document\.querySelectorAll\('a\[href\^="#"\]'\)/g, 'document.querySelectorAll(\'a[href*="#"]:not([href="#"])\')');
 
         return `<!DOCTYPE html>
 <html>
@@ -760,12 +762,19 @@ class EnhancedFrontendEditor {
     </div>
 
     <script>
-        // Project data
+        // Project data - FIXED: Define allPageNames properly
         const projectPages = ${JSON.stringify(htmlFiles)};
         const projectAssets = ${JSON.stringify(this.assets || [])};
         const currentProject = '${projectName}';
         const allPageNames = ${JSON.stringify(allHtmlFiles)};
         const currentProjectId = '${projectId}';
+
+        console.log('Project data initialized:', {
+            project: currentProject,
+            projectId: currentProjectId,
+            pages: allPageNames,
+            assetsCount: projectAssets.length
+        });
 
         // Multi-page navigation function
         function loadPage(pageName) {
@@ -779,7 +788,9 @@ class EnhancedFrontendEditor {
                     // Convert navigation links in the loaded page too
                     .replace(/<a[^>]*href=["']([^"']*\\.html)["'][^>]*>/gi, (match, hrefPage) => {
                         return match.replace(\`href="\${hrefPage}"\`, \`href="#" onclick="window.loadPage('\${hrefPage}')"\`);
-                    });
+                    })
+                    // Fix smooth scrolling in loaded pages
+                    .replace(/document\.querySelectorAll\('a\[href\^="#"\]'\)/g, 'document.querySelectorAll(\'a[href*="#"]:not([href="#"])\')');
                 
                 document.getElementById('content').innerHTML = pageHTML;
                 
@@ -792,7 +803,7 @@ class EnhancedFrontendEditor {
                     }
                 });
                 
-                // Update browser URL without reloading the page
+                // Update browser URL without reloading the page - FIXED URL format
                 try {
                     const newUrl = \`/frontend/\${currentProjectId}#\${pageName}\`;
                     window.history.pushState({ page: pageName, projectId: currentProjectId }, '', newUrl);
@@ -804,15 +815,29 @@ class EnhancedFrontendEditor {
                 
                 console.log('Page loaded successfully:', pageName);
                 
-                // Re-initialize any JavaScript for the new page
+                // Re-initialize any JavaScript for the new page - FIXED smooth scrolling
                 setTimeout(() => {
                     try {
+                        // Fix smooth scrolling - only for actual anchor links, not # alone
+                        document.querySelectorAll('a[href*="#"]:not([href="#"])').forEach(anchor => {
+                            anchor.addEventListener('click', function (e) {
+                                e.preventDefault();
+                                const target = document.querySelector(this.getAttribute('href'));
+                                if (target) {
+                                    target.scrollIntoView({
+                                        behavior: 'smooth',
+                                        block: 'start'
+                                    });
+                                }
+                            });
+                        });
+                        
                         // Re-run any initialization scripts
                         if (typeof initPage === 'function') {
                             initPage();
                         }
                     } catch (error) {
-                        console.log('No page-specific initialization needed');
+                        console.log('Page initialization completed with minor issues:', error);
                     }
                 }, 100);
                 
@@ -842,12 +867,12 @@ class EnhancedFrontendEditor {
         // Handle page load with hash
         window.addEventListener('load', function() {
             const hash = window.location.hash.replace('#', '');
-            if (hash && projectPages[hash] && hash !== (currentHtmlFile || 'index.html')) {
-                loadPage(hash);
+            if (hash && projectPages[hash] && hash !== '${currentHtmlFile}') {
+                setTimeout(() => loadPage(hash), 100);
             }
         });
 
-        // Make loadPage available globally
+        // Make functions available globally
         window.loadPage = loadPage;
         window.projectPages = projectPages;
         window.projectAssets = projectAssets;
@@ -869,11 +894,24 @@ class EnhancedFrontendEditor {
         console.log('Pages available:', allPageNames.length);
         console.log('Assets:', projectAssets.length);
         console.log('All pages:', allPageNames);
-        console.log('Current URL:', window.location.href);
         
-        // Initialize the page
+        // Initialize the page with fixed smooth scrolling
         document.addEventListener('DOMContentLoaded', function() {
             console.log('DOM fully loaded and parsed');
+            
+            // Fixed smooth scrolling - only for actual anchor links
+            document.querySelectorAll('a[href*="#"]:not([href="#"])').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const target = document.querySelector(this.getAttribute('href'));
+                    if (target) {
+                        target.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start'
+                        });
+                    }
+                });
+            });
             
             // Load page from hash if present
             const hash = window.location.hash.replace('#', '');
