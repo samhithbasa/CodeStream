@@ -719,7 +719,7 @@ generateFullHTML() {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${document.getElementById('project-name')?.value || 'My Project'}</title>
     <style>
-        /* Navigation styles for missing nav */
+        /* Navigation styles */
         .auto-nav {
             background: #f5f5f5;
             padding: 10px;
@@ -733,23 +733,29 @@ generateFullHTML() {
             margin: 0 10px;
             padding: 5px 10px;
             border-radius: 3px;
+            cursor: pointer;
         }
         .auto-nav a:hover {
             background: #3498db;
             color: white;
         }
         
+        /* Prevent all links from default behavior */
+        a[href$=".html"] {
+            cursor: pointer;
+        }
+        
         ${combinedCSS}
     </style>
 </head>
 <body>
-    <!-- Auto-generated navigation if user doesn't have one -->
+    <!-- Auto-generated navigation -->
     ${allHtmlFiles.length > 1 ? `
     <div class="auto-nav">
         <strong>Pages:</strong>
-        ${allHtmlFiles.map(page =>
-        `<a href="#" onclick="window.loadPage('${page}')">${page.replace('.html', '')}</a>`
-    ).join(' | ')}
+        ${allHtmlFiles.map(page => 
+            `<a class="nav-link" data-page="${page}">${page.replace('.html', '')}</a>`
+        ).join(' | ')}
     </div>
     ` : ''}
     
@@ -767,83 +773,73 @@ generateFullHTML() {
             allPages: ${JSON.stringify(allHtmlFiles)}
         };
         
-        // Function to replace asset URLs with base64 data - SIMPLIFIED VERSION
-        function replaceAssetUrls(html) {
+        // Function to process HTML content
+        function processPageHTML(html) {
             let processed = html;
             
+            // 1. Replace all asset URLs
             projectData.assets.forEach(asset => {
-                // Simple string replacement for common patterns
-                // Replace src="filename.jpg" with base64 data
+                // Simple replacement for images
                 processed = processed.replace(
                     new RegExp('src=["\\\']' + asset.name + '["\\\']', 'gi'),
                     'src="' + asset.data + '"'
                 );
-                
-                // Replace href="filename.jpg" with base64 data
                 processed = processed.replace(
-                    new RegExp('href=["\\\']' + asset.name + '["\\\']', 'gi'),
-                    'href="' + asset.data + '"'
-                );
-                
-                // Replace url(filename.jpg) with base64 data
-                processed = processed.replace(
-                    new RegExp('url\\(["\\\']?' + asset.name + '["\\\']?\\)', 'gi'),
-                    'url("' + asset.data + '")'
+                    new RegExp("src=['\"]" + asset.name + "['\"]", 'gi'),
+                    "src='" + asset.data + "'"
                 );
             });
+            
+            // 2. Convert all .html links to click handlers
+            processed = processed.replace(
+                /<a\s+(?:[^>]*?\s+)?href=["']([^"']*\\.html)(?:#[^"']*)?["'][^>]*>/gi,
+                function(match, href) {
+                    const pageName = href.split('/').pop();
+                    if (projectData.html[pageName]) {
+                        // Replace with data attribute
+                        return match.replace(
+                            'href="' + href + '"',
+                            'href="#" data-page="' + pageName + '"'
+                        );
+                    }
+                    return match;
+                }
+            );
             
             return processed;
         }
         
-        // Event delegation for all HTML links
-        document.addEventListener('click', function(e) {
-            const link = e.target.closest('a[href$=".html"]');
-            
-            if (link && !link.hasAttribute('data-external')) {
-                e.preventDefault();
-                const href = link.getAttribute('href');
-                const pageName = href.split('/').pop(); // Get filename
-                
-                if (projectData.html[pageName]) {
-                    loadPage(pageName);
-                    return false;
-                }
-            }
-        });
-        
-        // Load page function
+        // Main page loader
         function loadPage(pageName) {
-            console.log('Loading page:', pageName, 'Assets:', projectData.assets.length);
+            console.log('Loading:', pageName);
             
-            if (!projectData.html[pageName]) {
+            const html = projectData.html[pageName];
+            if (!html) {
                 document.getElementById('page-content').innerHTML = 
-                    '<div style="padding: 20px; color: red; border: 2px solid red;">' +
-                    '<h3>Page Not Found</h3>' +
-                    '<p>The page <strong>' + pageName + '</strong> does not exist.</p>' +
+                    '<div style="padding: 20px; color: red;">' +
+                    '<h3>Page Not Found: ' + pageName + '</h3>' +
                     '</div>';
                 return;
             }
             
-            // Get HTML and replace asset URLs
-            let pageHtml = projectData.html[pageName];
-            pageHtml = replaceAssetUrls(pageHtml);
+            // Process and display the page
+            const processedHTML = processPageHTML(html);
+            document.getElementById('page-content').innerHTML = processedHTML;
             
-            // Update content
-            document.getElementById('page-content').innerHTML = pageHtml;
+            // Update URL
+            history.pushState({page: pageName}, '', '?page=' + pageName);
             
-            // Update URL without reloading
-            history.pushState({ page: pageName }, '', '?page=' + pageName);
-            
-            // Update navigation highlights
-            updateNavHighlight(pageName);
+            // Update active nav
+            updateActiveNav(pageName);
             
             console.log('Page loaded successfully');
         }
         
-        // Update navigation highlight
-        function updateNavHighlight(pageName) {
+        // Update active navigation
+        function updateActiveNav(pageName) {
+            // Update auto-nav
             document.querySelectorAll('.auto-nav a').forEach(link => {
-                if (link.getAttribute('onclick') && link.getAttribute('onclick').includes(pageName)) {
+                if (link.getAttribute('data-page') === pageName) {
                     link.style.backgroundColor = '#3498db';
                     link.style.color = 'white';
                 } else {
@@ -853,20 +849,45 @@ generateFullHTML() {
             });
         }
         
-        // Handle browser back/forward
+        // Global click handler for ALL links
+        document.addEventListener('click', function(e) {
+            // Handle navigation links
+            let link = e.target.closest('a');
+            
+            if (link) {
+                const href = link.getAttribute('href');
+                const dataPage = link.getAttribute('data-page');
+                
+                // If it's a .html link or has data-page attribute
+                if ((href && href.endsWith('.html')) || dataPage) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    let pageName;
+                    if (dataPage) {
+                        pageName = dataPage;
+                    } else if (href) {
+                        pageName = href.split('/').pop();
+                    }
+                    
+                    if (pageName && projectData.html[pageName]) {
+                        loadPage(pageName);
+                    }
+                    return false;
+                }
+            }
+        });
+        
+        // Handle browser navigation
         window.addEventListener('popstate', function(e) {
             if (e.state && e.state.page) {
                 loadPage(e.state.page);
             }
         });
         
-        // Make functions globally available
+        // Make loadPage available globally
         window.loadPage = loadPage;
         window.projectData = projectData;
-        
-        // Load initial page
-        const urlParams = new URLSearchParams(window.location.search);
-        const initialPage = urlParams.get('page') || '${currentHtmlFile}' || 'index.html';
         
         // Execute project JavaScript
         try {
@@ -875,9 +896,16 @@ generateFullHTML() {
             console.error('JS Error:', error);
         }
         
-        // Initialize
+        // Initial page load
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('Initializing project...');
+            const urlParams = new URLSearchParams(window.location.search);
+            const initialPage = urlParams.get('page') || '${currentHtmlFile}' || 'index.html';
+            
+            // Process initial content
+            const initialContent = document.getElementById('page-content').innerHTML;
+            document.getElementById('page-content').innerHTML = processPageHTML(initialContent);
+            
+            // Load the page
             loadPage(initialPage);
         });
     </script>
