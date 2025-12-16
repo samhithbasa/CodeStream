@@ -687,9 +687,6 @@ generateFullHTML() {
     const currentHtmlFile = this.currentFile.html || 'index.html';
     const mainHTML = htmlFiles[currentHtmlFile] || '<h1>No content</h1>';
 
-    // Process the HTML for preview
-    const processedHTML = this.processHTMLForPreview(mainHTML);
-
     // Combine all CSS
     let combinedCSS = '';
     Object.values(cssFiles).forEach(css => {
@@ -712,6 +709,32 @@ generateFullHTML() {
 
     const allHtmlFiles = Object.keys(htmlFiles);
 
+    // Process ALL HTML files for deployment
+    const processedHtmlFiles = {};
+    Object.keys(htmlFiles).forEach(filename => {
+        let html = htmlFiles[filename];
+        
+        // 1. Convert all .html links to JavaScript calls
+        html = html.replace(
+            /<a\s+(?:[^>]*?\s+)?href=["']([^"']*\.html)(?:#[^"']*)?["'][^>]*>/gi,
+            (match, href) => {
+                const pageName = href.split('/').pop();
+                return match.replace(
+                    `href="${href}"`,
+                    `href="javascript:void(0)" onclick="window.loadPage('${pageName}')"`
+                );
+            }
+        );
+        
+        // 2. Replace image sources with base64 data
+        this.assets.forEach(asset => {
+            const regex = new RegExp(`src=["']([^"']*${asset.name})["']`, 'gi');
+            html = html.replace(regex, `src="${asset.data}"`);
+        });
+        
+        processedHtmlFiles[filename] = html;
+    });
+
     return `<!DOCTYPE html>
 <html>
 <head>
@@ -719,195 +742,100 @@ generateFullHTML() {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${document.getElementById('project-name')?.value || 'My Project'}</title>
     <style>
-        /* Navigation styles */
+        /* Force all links to use cursor pointer */
+        a[href$=".html"], a[onclick*="loadPage"] {
+            cursor: pointer;
+            text-decoration: none;
+            color: #3498db;
+        }
+        a[href$=".html"]:hover, a[onclick*="loadPage"]:hover {
+            text-decoration: underline;
+        }
+        
+        /* Auto navigation */
         .auto-nav {
             background: #f5f5f5;
             padding: 10px;
             margin-bottom: 20px;
             border-radius: 5px;
-            display: ${allHtmlFiles.length > 1 ? 'block' : 'none'};
         }
         .auto-nav a {
             color: #3498db;
-            text-decoration: none;
             margin: 0 10px;
             padding: 5px 10px;
-            border-radius: 3px;
-            cursor: pointer;
         }
         .auto-nav a:hover {
             background: #3498db;
             color: white;
         }
         
-        /* Prevent all links from default behavior */
-        a[href$=".html"] {
-            cursor: pointer;
-        }
-        
         ${combinedCSS}
     </style>
 </head>
 <body>
-    <!-- Auto-generated navigation -->
-    ${allHtmlFiles.length > 1 ? `
-    <div class="auto-nav">
-        <strong>Pages:</strong>
+    <!-- Auto navigation bar -->
+    <div class="auto-nav" style="display: ${allHtmlFiles.length > 1 ? 'block' : 'none'}">
+        <strong>Navigate:</strong>
         ${allHtmlFiles.map(page => 
-            `<a class="nav-link" data-page="${page}">${page.replace('.html', '')}</a>`
+            `<a href="javascript:void(0)" onclick="loadPage('${page}')">${page.replace('.html', '')}</a>`
         ).join(' | ')}
     </div>
-    ` : ''}
     
     <div id="page-content">
-        ${processedHTML}
+        ${processedHtmlFiles[currentHtmlFile]}
     </div>
 
     <script>
-        // Project data
-        const projectData = {
-            html: ${JSON.stringify(htmlFiles)},
-            css: ${JSON.stringify(cssFiles)},
-            js: ${JSON.stringify(jsFiles)},
-            assets: ${JSON.stringify(this.assets || [])},
-            allPages: ${JSON.stringify(allHtmlFiles)}
-        };
+        // Store all pages
+        const pages = ${JSON.stringify(processedHtmlFiles)};
+        const assets = ${JSON.stringify(this.assets || [])};
         
-        // Function to process HTML content
-        function processPageHTML(html) {
-            let processed = html;
-            
-            // 1. Replace all asset URLs
-            projectData.assets.forEach(asset => {
-                // Simple replacement for images
-                processed = processed.replace(
-                    new RegExp('src=["\\\']' + asset.name + '["\\\']', 'gi'),
-                    'src="' + asset.data + '"'
-                );
-                processed = processed.replace(
-                    new RegExp("src=['\"]" + asset.name + "['\"]", 'gi'),
-                    "src='" + asset.data + "'"
-                );
-            });
-            
-            // 2. Convert all .html links to click handlers
-            processed = processed.replace(
-                /<a\s+(?:[^>]*?\s+)?href=["']([^"']*\\.html)(?:#[^"']*)?["'][^>]*>/gi,
-                function(match, href) {
-                    const pageName = href.split('/').pop();
-                    if (projectData.html[pageName]) {
-                        // Replace with data attribute
-                        return match.replace(
-                            'href="' + href + '"',
-                            'href="#" data-page="' + pageName + '"'
-                        );
-                    }
-                    return match;
-                }
-            );
-            
-            return processed;
-        }
-        
-        // Main page loader
+        // Simple page loader
         function loadPage(pageName) {
-            console.log('Loading:', pageName);
+            console.log('Loading page:', pageName);
             
-            const html = projectData.html[pageName];
-            if (!html) {
-                document.getElementById('page-content').innerHTML = 
-                    '<div style="padding: 20px; color: red;">' +
-                    '<h3>Page Not Found: ' + pageName + '</h3>' +
-                    '</div>';
-                return;
-            }
-            
-            // Process and display the page
-            const processedHTML = processPageHTML(html);
-            document.getElementById('page-content').innerHTML = processedHTML;
-            
-            // Update URL
-            history.pushState({page: pageName}, '', '?page=' + pageName);
-            
-            // Update active nav
-            updateActiveNav(pageName);
-            
-            console.log('Page loaded successfully');
-        }
-        
-        // Update active navigation
-        function updateActiveNav(pageName) {
-            // Update auto-nav
-            document.querySelectorAll('.auto-nav a').forEach(link => {
-                if (link.getAttribute('data-page') === pageName) {
-                    link.style.backgroundColor = '#3498db';
-                    link.style.color = 'white';
-                } else {
-                    link.style.backgroundColor = '';
-                    link.style.color = '#3498db';
-                }
-            });
-        }
-        
-        // Global click handler for ALL links
-        document.addEventListener('click', function(e) {
-            // Handle navigation links
-            let link = e.target.closest('a');
-            
-            if (link) {
-                const href = link.getAttribute('href');
-                const dataPage = link.getAttribute('data-page');
+            if (pages[pageName]) {
+                document.getElementById('page-content').innerHTML = pages[pageName];
                 
-                // If it's a .html link or has data-page attribute
-                if ((href && href.endsWith('.html')) || dataPage) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    
-                    let pageName;
-                    if (dataPage) {
-                        pageName = dataPage;
-                    } else if (href) {
-                        pageName = href.split('/').pop();
-                    }
-                    
-                    if (pageName && projectData.html[pageName]) {
-                        loadPage(pageName);
-                    }
-                    return false;
+                // Update URL without reloading
+                if (history.pushState) {
+                    history.pushState({page: pageName}, '', '?page=' + pageName);
                 }
+                
+                console.log('Page loaded successfully');
+            } else {
+                document.getElementById('page-content').innerHTML = 
+                    '<h2 style="color: red;">Page not found: ' + pageName + '</h2>';
             }
-        });
+        }
         
-        // Handle browser navigation
+        // Handle back/forward buttons
         window.addEventListener('popstate', function(e) {
             if (e.state && e.state.page) {
                 loadPage(e.state.page);
             }
         });
         
-        // Make loadPage available globally
+        // Make function available globally
         window.loadPage = loadPage;
-        window.projectData = projectData;
         
-        // Execute project JavaScript
+        // Load page from URL or default
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const page = urlParams.get('page') || '${currentHtmlFile}' || 'index.html';
+            
+            // If not already on that page, load it
+            if (page !== '${currentHtmlFile}') {
+                loadPage(page);
+            }
+        });
+        
+        // Run project JavaScript
         try {
             ${combinedJS}
         } catch (error) {
-            console.error('JS Error:', error);
+            console.error('JavaScript error:', error);
         }
-        
-        // Initial page load
-        document.addEventListener('DOMContentLoaded', function() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const initialPage = urlParams.get('page') || '${currentHtmlFile}' || 'index.html';
-            
-            // Process initial content
-            const initialContent = document.getElementById('page-content').innerHTML;
-            document.getElementById('page-content').innerHTML = processPageHTML(initialContent);
-            
-            // Load the page
-            loadPage(initialPage);
-        });
     </script>
 </body>
 </html>`;
