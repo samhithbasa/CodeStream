@@ -2,6 +2,8 @@ console.log('Enhanced Frontend Editor JavaScript loaded');
 
 class EnhancedFrontendEditor {
     constructor() {
+        console.log('Constructor called');
+        console.log('generateFullHTML exists?', typeof this.generateFullHTML);
         this.currentProject = null;
         this.files = {
             html: { 'index.html': '<!DOCTYPE html>\n<html>\n<head>\n    <title>My Project</title>\n</head>\n<body>\n    <h1>Hello World!</h1>\n</body>\n</html>' },
@@ -55,6 +57,8 @@ class EnhancedFrontendEditor {
     }
 
     init() {
+        console.log('Init called');
+        console.log('generateFullHTML exists?', typeof this.generateFullHTML);
         this.bindEvents();
         this.updateFileTree();
         this.loadAssetsFromLocalStorage(); // Load assets first
@@ -680,97 +684,111 @@ class EnhancedFrontendEditor {
     }
 
     generateFullHTML() {
-        const htmlFiles = this.files.html || {};
-        const cssFiles = this.files.css || {};
-        const jsFiles = this.files.js || {};
+        console.log('🚀 generateFullHTML called');
 
-        const currentHtmlFile = this.currentFile.html || 'index.html';
-        const mainHTML = htmlFiles[currentHtmlFile] || '<h1>No content</h1>';
+        try {
+            // Get all files
+            const htmlFiles = this.files.html || {};
+            const cssFiles = this.files.css || {};
+            const jsFiles = this.files.js || {};
 
-        // Combine all CSS
-        let combinedCSS = '';
-        Object.values(cssFiles).forEach(css => {
-            if (css && typeof css === 'string') {
-                combinedCSS += css + '\n';
-            }
-        });
+            const currentHtmlFile = this.currentFile.html || 'index.html';
+            const mainHTML = htmlFiles[currentHtmlFile] || '<h1>No content</h1>';
+            const allHtmlFiles = Object.keys(htmlFiles);
 
-        // Combine all JS safely
-        let combinedJS = '';
-        Object.values(jsFiles).forEach(js => {
-            if (js && typeof js === 'string') {
-                const safeJS = js
-                    .replace(/<\/script>/gi, '<\\/script>')
-                    .replace(/`/g, '\\`')
-                    .replace(/\${/g, '\\${');
-                combinedJS += safeJS + '\n';
-            }
-        });
-
-        const allHtmlFiles = Object.keys(htmlFiles);
-
-        // Process ALL HTML files for deployment
-        const processedHtmlFiles = {};
-        Object.keys(htmlFiles).forEach(filename => {
-            let html = htmlFiles[filename];
-
-            // 1. Convert all .html links to JavaScript calls
-            html = html.replace(
-                /<a\s+(?:[^>]*?\s+)?href=["']([^"']*\.html)(?:#[^"']*)?["'][^>]*>/gi,
-                (match, href) => {
-                    const pageName = href.split('/').pop();
-                    if (htmlFiles[pageName]) {
-                        return match.replace(
-                            `href="${href}"`,
-                            `href="javascript:void(0)" onclick="window.loadPage('${pageName}')"`
-                        );
-                    }
-                    return match;
-                }
-            );
-
-            // 2. Replace image sources with base64 data
-            this.assets.forEach(asset => {
-                // Simple replacement for src="filename.jpg"
-                const regex1 = new RegExp(`src=["']([^"']*${asset.name})["']`, 'gi');
-                html = html.replace(regex1, `src="${asset.data}"`);
-
-                // Also handle src='filename.jpg' (single quotes)
-                const regex2 = new RegExp(`src=['"]([^'"]*${asset.name})['"]`, 'gi');
-                html = html.replace(regex2, `src="${asset.data}"`);
+            console.log('📁 Files:', {
+                htmlFiles: Object.keys(htmlFiles),
+                currentFile: currentHtmlFile,
+                allFiles: allHtmlFiles,
+                assetsCount: this.assets?.length || 0
             });
 
-            processedHtmlFiles[filename] = html;
-        });
+            // Combine CSS
+            let combinedCSS = '';
+            if (cssFiles) {
+                Object.values(cssFiles).forEach(css => {
+                    if (css && typeof css === 'string') {
+                        combinedCSS += css + '\n';
+                    }
+                });
+            }
 
-        return `<!DOCTYPE html>
+            // Combine JS safely
+            let combinedJS = '';
+            if (jsFiles) {
+                Object.values(jsFiles).forEach(js => {
+                    if (js && typeof js === 'string') {
+                        combinedJS += js + '\n';
+                    }
+                });
+            }
+
+            // Process ALL HTML files
+            const processedHtmlFiles = {};
+            Object.keys(htmlFiles).forEach(filename => {
+                let html = htmlFiles[filename];
+
+                // 1. Convert links to onclick handlers
+                html = html.replace(
+                    /<a\s+(?:[^>]*?\s+)?href=["']([^"']*\.html)(?:#[^"']*)?["'][^>]*>/gi,
+                    (match, href) => {
+                        const pageName = href.split('/').pop();
+                        if (htmlFiles[pageName]) {
+                            return match.replace(
+                                `href="${href}"`,
+                                `href="#" onclick="loadPage('${pageName}'); return false;"`
+                            );
+                        }
+                        return match;
+                    }
+                );
+
+                // 2. Replace image sources with base64 data
+                if (this.assets && this.assets.length > 0) {
+                    this.assets.forEach(asset => {
+                        // Simple replacement for src="filename.jpg"
+                        const regex = new RegExp(`src=["']${asset.name}["']`, 'gi');
+                        html = html.replace(regex, `src="${asset.data}"`);
+
+                        // Also handle src='filename.jpg' (single quotes)
+                        const regex2 = new RegExp(`src=['"]${asset.name}['"]`, 'gi');
+                        html = html.replace(regex2, `src="${asset.data}"`);
+                    });
+                }
+
+                processedHtmlFiles[filename] = html;
+            });
+
+            // Generate the final HTML
+            const html = `<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${document.getElementById('project-name')?.value || 'My Project'}</title>
     <style>
-        /* Force all links to use cursor pointer */
-        a[href$=".html"], a[onclick*="loadPage"] {
-            cursor: pointer;
-            text-decoration: none;
-            color: #3498db;
-        }
-        a[href$=".html"]:hover, a[onclick*="loadPage"]:hover {
-            text-decoration: underline;
+        /* Basic styles */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: white;
+            color: #333;
         }
         
-        /* Auto navigation */
+        /* Navigation */
         .auto-nav {
             background: #f5f5f5;
-            padding: 10px;
-            margin-bottom: 20px;
-            border-radius: 5px;
+            padding: 15px;
+            margin: -20px -20px 20px -20px;
+            border-bottom: 1px solid #ddd;
         }
         .auto-nav a {
             color: #3498db;
+            text-decoration: none;
             margin: 0 10px;
-            padding: 5px 10px;
+            padding: 8px 16px;
+            border-radius: 4px;
             cursor: pointer;
         }
         .auto-nav a:hover {
@@ -778,86 +796,131 @@ class EnhancedFrontendEditor {
             color: white;
         }
         
+        /* Content area */
+        #page-content {
+            padding: 20px;
+        }
+        
+        /* Make all .html links look clickable */
+        a[href$=".html"] {
+            cursor: pointer;
+            color: #0066cc;
+        }
+        
         ${combinedCSS}
     </style>
 </head>
 <body>
-    <!-- Auto navigation bar -->
-    <div class="auto-nav" style="display: ${allHtmlFiles.length > 1 ? 'block' : 'none'}">
-        <strong>Navigate:</strong>
+    <!-- Auto navigation (only if multiple pages) -->
+    ${allHtmlFiles.length > 1 ? `
+    <div class="auto-nav">
+        <strong>Pages:</strong>
         ${allHtmlFiles.map(page =>
-            `<a href="javascript:void(0)" onclick="loadPage('${page}')">${page.replace('.html', '')}</a>`
-        ).join(' | ')}
+                `<a href="#" onclick="loadPage('${page}'); return false;">${page.replace('.html', '')}</a>`
+            ).join(' | ')}
     </div>
+    ` : ''}
     
     <div id="page-content">
-        ${processedHtmlFiles[currentHtmlFile]}
+        ${processedHtmlFiles[currentHtmlFile] || mainHTML}
     </div>
 
     <script>
-        // Store all pages
-        const pages = ${JSON.stringify(processedHtmlFiles)};
-        const assets = ${JSON.stringify(this.assets || [])};
+        // ========== PROJECT DATA ==========
+        const projectData = {
+            html: ${JSON.stringify(processedHtmlFiles)},
+            assets: ${JSON.stringify(this.assets || [])},
+            allPages: ${JSON.stringify(allHtmlFiles)}
+        };
         
-        // Simple page loader
+        console.log('📦 Project loaded:', {
+            pages: Object.keys(projectData.html),
+            assets: projectData.assets.length,
+            currentHash: window.location.hash
+        });
+        
+        // ========== LOAD PAGE FUNCTION ==========
         function loadPage(pageName) {
-            console.log('Loading page:', pageName);
+            console.log('🔗 Loading page:', pageName);
             
-            if (pages[pageName]) {
-                document.getElementById('page-content').innerHTML = pages[pageName];
-                
-                // ✅ CRITICAL: Use hash instead of query parameter
-                window.location.hash = pageName;
-                
-                console.log('Page loaded successfully');
-            } else {
+            // Check if page exists
+            if (!projectData.html[pageName]) {
+                console.error('❌ Page not found:', pageName);
                 document.getElementById('page-content').innerHTML = 
-                    '<h2 style="color: red;">Page not found: ' + pageName + '</h2>';
+                    '<div style="padding: 20px; border: 2px solid red; color: red;">' +
+                    '<h2>Page Not Found</h2>' +
+                    '<p>The page <strong>' + pageName + '</strong> does not exist.</p>' +
+                    '</div>';
+                return;
             }
+            
+            // Update content
+            document.getElementById('page-content').innerHTML = projectData.html[pageName];
+            
+            // Update URL hash (NO page reload!)
+            window.location.hash = pageName;
+            
+            console.log('✅ Page loaded:', pageName);
         }
         
-        // Handle hash changes (for back/forward buttons)
+        // ========== HASH CHANGE HANDLER ==========
         window.addEventListener('hashchange', function() {
             const pageName = window.location.hash.replace('#', '');
-            if (pageName && pages[pageName]) {
-                // Don't call loadPage again to avoid infinite loop
-                document.getElementById('page-content').innerHTML = pages[pageName];
+            console.log('🔄 Hash changed to:', pageName);
+            
+            if (pageName && projectData.html[pageName]) {
+                // Load the page from hash
+                document.getElementById('page-content').innerHTML = projectData.html[pageName];
             }
         });
         
-        // Make function available globally
-        window.loadPage = loadPage;
-        window.pages = pages; // For debugging
-        
-        // Load page from hash or default
+        // ========== INITIAL LOAD ==========
         document.addEventListener('DOMContentLoaded', function() {
-            const pageName = window.location.hash.replace('#', '') || 
-                            '${currentHtmlFile}' || 'index.html';
+            console.log('🚀 DOM loaded');
             
-            console.log('Initial page:', pageName, 'Available pages:', Object.keys(pages));
+            // Get initial page from hash or use default
+            const hash = window.location.hash.replace('#', '');
+            const initialPage = hash || '${currentHtmlFile}' || 'index.html';
             
-            if (pages[pageName]) {
-                document.getElementById('page-content').innerHTML = pages[pageName];
-            } else if (pages['index.html']) {
-                // Fallback to index.html
-                document.getElementById('page-content').innerHTML = pages['index.html'];
+            console.log('📄 Initial page:', initialPage);
+            
+            // Load the page
+            if (projectData.html[initialPage]) {
+                document.getElementById('page-content').innerHTML = projectData.html[initialPage];
             }
         });
         
-        // Run project JavaScript
+        // ========== GLOBAL ACCESS ==========
+        window.loadPage = loadPage;
+        window.projectData = projectData; // For debugging
+        
+        // ========== RUN PROJECT JAVASCRIPT ==========
         try {
             ${combinedJS}
         } catch (error) {
-            console.error('JavaScript error:', error);
+            console.error('❌ JavaScript error:', error);
         }
         
-        // Debug info
-        console.log('Project initialized');
-        console.log('Pages available:', Object.keys(pages));
-        console.log('Assets:', assets.length);
+        console.log('🎉 Project initialization complete!');
     </script>
 </body>
 </html>`;
+
+            console.log('✅ HTML generated successfully');
+            return html;
+
+        } catch (error) {
+            console.error('❌ Error in generateFullHTML:', error);
+            return `<!DOCTYPE html>
+<html>
+<head><title>Error</title></head>
+<body>
+    <h1 style="color: red;">Error Generating Preview</h1>
+    <p>${error.message}</p>
+    <p>Check browser console for details.</p>
+</body>
+</html>`;
+        }
     }
 
     // Add this method in your class (anywhere, but near other setup methods is good)
@@ -1235,7 +1298,12 @@ class EnhancedFrontendEditor {
         console.log('Current Files:', this.files);
         console.log('Current Assets:', this.assets);
     }
+
 }
+
+// Debug: List all methods in the class
+console.log('Class prototype methods:',
+    Object.getOwnPropertyNames(EnhancedFrontendEditor.prototype));
 
 /* ----------------------------------------------------
    BOOT EDITOR
@@ -1243,3 +1311,4 @@ class EnhancedFrontendEditor {
 document.addEventListener('DOMContentLoaded', () => {
     window.frontendEditor = new EnhancedFrontendEditor();
 });
+
