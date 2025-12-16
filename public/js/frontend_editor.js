@@ -619,31 +619,54 @@ class EnhancedFrontendEditor {
     }
 
     updatePreview() {
-        const fullHTML = this.generateFullHTML();
-        const frame = document.getElementById('preview-frame');
-        if (!frame) return;
+        console.log('🔄 Updating preview...');
 
         try {
-            const doc = frame.contentDocument || frame.contentWindow.document;
-            doc.open();
-            doc.write(fullHTML);
-            doc.close();
+            // Check if generateFullHTML exists
+            if (typeof this.generateFullHTML !== 'function') {
+                console.error('❌ generateFullHTML is not a function!');
+                const frame = document.getElementById('preview-frame');
+                if (frame) {
+                    frame.srcdoc = '<h1>Preview Error</h1><p>generateFullHTML missing</p>';
+                }
+                return;
+            }
 
-            // Add error handling for frame
+            // Generate HTML
+            const fullHTML = this.generateFullHTML();
+
+            // Get the iframe
+            const frame = document.getElementById('preview-frame');
+            if (!frame) {
+                console.error('❌ Preview frame not found');
+                return;
+            }
+
+            console.log('📝 HTML generated, length:', fullHTML.length);
+
+            // SAFEST METHOD: Use srcdoc (no document.write issues)
+            frame.srcdoc = fullHTML;
+
+            // Optional: Add event listeners
             frame.onload = () => {
-                console.log('Preview frame loaded successfully');
+                console.log('✅ Preview loaded successfully');
             };
 
-            frame.onerror = (error) => {
-                console.error('Preview frame error:', error);
-                // Fallback: try to set srcdoc if write fails
-                frame.srcdoc = fullHTML;
+            frame.onerror = (err) => {
+                console.error('❌ Preview load error:', err);
             };
 
         } catch (error) {
-            console.error('Error updating preview:', error);
-            // Fallback method
-            frame.srcdoc = fullHTML;
+            console.error('💥 Error in updatePreview:', error);
+
+            const frame = document.getElementById('preview-frame');
+            if (frame) {
+                frame.srcdoc = `
+                <h1 style="color: red;">Preview Error</h1>
+                <p>${error.message}</p>
+                <p>Check console for details.</p>
+            `;
+            }
         }
     }
 
@@ -718,7 +741,14 @@ class EnhancedFrontendEditor {
             if (jsFiles) {
                 Object.values(jsFiles).forEach(js => {
                     if (js && typeof js === 'string') {
-                        combinedJS += js + '\n';
+                        // Properly escape for template literal
+                        const safeJS = js
+                            .replace(/\\/g, '\\\\')  // Escape backslashes first
+                            .replace(/`/g, '\\`')     // Escape backticks
+                            .replace(/\${/g, '\\${')  // Escape template expressions
+                            .replace(/\n/g, '\\n')    // Preserve newlines
+                            .replace(/\r/g, '\\r');   // Preserve carriage returns
+                        combinedJS += safeJS + '\n';  // Fixed: Use single backslash
                     }
                 });
             }
@@ -746,12 +776,15 @@ class EnhancedFrontendEditor {
                 // 2. Replace image sources with base64 data
                 if (this.assets && this.assets.length > 0) {
                     this.assets.forEach(asset => {
-                        // Simple replacement for src="filename.jpg"
-                        const regex = new RegExp(`src=["']${asset.name}["']`, 'gi');
-                        html = html.replace(regex, `src="${asset.data}"`);
+                        // Escape asset name for regex
+                        const escapedName = asset.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-                        // Also handle src='filename.jpg' (single quotes)
-                        const regex2 = new RegExp(`src=['"]${asset.name}['"]`, 'gi');
+                        // Replace src="filename.jpg"
+                        const regex1 = new RegExp(`src=["']([^"']*${escapedName})["']`, 'gi');
+                        html = html.replace(regex1, `src="${asset.data}"`);
+
+                        // Replace src='filename.jpg' (single quotes)
+                        const regex2 = new RegExp(`src=['"]([^'"]*${escapedName})['"]`, 'gi');
                         html = html.replace(regex2, `src="${asset.data}"`);
                     });
                 }
@@ -906,23 +939,17 @@ class EnhancedFrontendEditor {
 </body>
 </html>`;
 
-            console.log('✅ HTML generated successfully');
-            return html;
+            // Clean up any invalid characters
+            const cleanHTML = html.replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
+
+            console.log('✅ HTML generated successfully, length:', cleanHTML.length);
+            return cleanHTML;
 
         } catch (error) {
             console.error('❌ Error in generateFullHTML:', error);
-            return `<!DOCTYPE html>
-<html>
-<head><title>Error</title></head>
-<body>
-    <h1 style="color: red;">Error Generating Preview</h1>
-    <p>${error.message}</p>
-    <p>Check browser console for details.</p>
-</body>
-</html>`;
+            return '<!DOCTYPE html><html><head><title>Error</title></head><body><h1 style="color: red;">Error Generating Preview</h1><p>' + error.message + '</p><p>Check browser console for details.</p></body></html>';
         }
     }
-
     // Add this method in your class (anywhere, but near other setup methods is good)
     setupHashNavigation() {
         window.addEventListener('hashchange', () => {
@@ -1042,7 +1069,7 @@ class EnhancedFrontendEditor {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    'Authorization': `Bearer ${token} `
                 },
                 body: JSON.stringify({
                     name: projectName,
@@ -1114,7 +1141,7 @@ class EnhancedFrontendEditor {
         try {
             const headers = {};
             if (token) {
-                headers['Authorization'] = `Bearer ${token}`;
+                headers['Authorization'] = `Bearer ${token} `;
             }
 
             const res = await fetch('/api/frontend/projects', {
@@ -1122,7 +1149,7 @@ class EnhancedFrontendEditor {
             });
 
             if (!res.ok) {
-                throw new Error(`Failed to load projects: ${res.status}`);
+                throw new Error(`Failed to load projects: ${res.status} `);
             }
 
             const projects = await res.json();
@@ -1143,12 +1170,12 @@ class EnhancedFrontendEditor {
         if (!list) return;
 
         if (!projects || projects.length === 0) {
-            list.innerHTML = `<p style="text-align:center;padding:20px;color:#666;">No projects found. Create your first project!</p>`;
+            list.innerHTML = `< p style = "text-align:center;padding:20px;color:#666;" > No projects found.Create your first project!</p > `;
             return;
         }
 
         list.innerHTML = projects.map(p => `
-            <div class="project-item">
+                < div class="project-item" >
                 <div class="project-info">
                     <h3>${this.escapeHtml(p.name || 'Untitled Project')}</h3>
                     <p class="project-meta">
@@ -1168,8 +1195,8 @@ class EnhancedFrontendEditor {
                     <button class="btn btn-open" onclick="frontendEditor.openProject('${p.id}')">Open</button>
                     <button class="btn btn-delete" onclick="frontendEditor.deleteProject('${p.id}','${p.name || 'Untitled'}')">Delete</button>
                 </div>
-            </div>
-        `).join('');
+            </div >
+                `).join('');
     }
 
     debugAssets() {
@@ -1184,9 +1211,9 @@ class EnhancedFrontendEditor {
     async openProject(projectId) {
         try {
             const token = Cookies.get('token');
-            const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+            const headers = token ? { 'Authorization': `Bearer ${token} ` } : {};
 
-            const response = await fetch(`/api/frontend/project/${projectId}`, {
+            const response = await fetch(`/ api / frontend / project / ${projectId} `, {
                 headers: headers
             });
 
@@ -1249,9 +1276,9 @@ class EnhancedFrontendEditor {
         if (!confirm(`Delete ${name}?`)) return;
 
         try {
-            const res = await fetch(`/api/frontend/project/${id}`, {
+            const res = await fetch(`/ api / frontend / project / ${id} `, {
                 method: "DELETE",
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: { 'Authorization': `Bearer ${token} ` }
             });
 
             if (!res.ok) throw new Error("Delete error");
