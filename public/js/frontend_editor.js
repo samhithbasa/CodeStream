@@ -679,7 +679,7 @@ class EnhancedFrontendEditor {
         return processed;
     }
 
-generateFullHTML() {
+ggenerateFullHTML() {
     const htmlFiles = this.files.html || {};
     const cssFiles = this.files.css || {};
     const jsFiles = this.files.js || {};
@@ -719,17 +719,25 @@ generateFullHTML() {
             /<a\s+(?:[^>]*?\s+)?href=["']([^"']*\.html)(?:#[^"']*)?["'][^>]*>/gi,
             (match, href) => {
                 const pageName = href.split('/').pop();
-                return match.replace(
-                    `href="${href}"`,
-                    `href="javascript:void(0)" onclick="window.loadPage('${pageName}')"`
-                );
+                if (htmlFiles[pageName]) {
+                    return match.replace(
+                        `href="${href}"`,
+                        `href="javascript:void(0)" onclick="window.loadPage('${pageName}')"`
+                    );
+                }
+                return match;
             }
         );
         
         // 2. Replace image sources with base64 data
         this.assets.forEach(asset => {
-            const regex = new RegExp(`src=["']([^"']*${asset.name})["']`, 'gi');
-            html = html.replace(regex, `src="${asset.data}"`);
+            // Simple replacement for src="filename.jpg"
+            const regex1 = new RegExp(`src=["']([^"']*${asset.name})["']`, 'gi');
+            html = html.replace(regex1, `src="${asset.data}"`);
+            
+            // Also handle src='filename.jpg' (single quotes)
+            const regex2 = new RegExp(`src=['"]([^'"]*${asset.name})['"]`, 'gi');
+            html = html.replace(regex2, `src="${asset.data}"`);
         });
         
         processedHtmlFiles[filename] = html;
@@ -763,6 +771,7 @@ generateFullHTML() {
             color: #3498db;
             margin: 0 10px;
             padding: 5px 10px;
+            cursor: pointer;
         }
         .auto-nav a:hover {
             background: #3498db;
@@ -797,10 +806,8 @@ generateFullHTML() {
             if (pages[pageName]) {
                 document.getElementById('page-content').innerHTML = pages[pageName];
                 
-                // Update URL without reloading
-                if (history.pushState) {
-                    history.pushState({page: pageName}, '', '?page=' + pageName);
-                }
+                // ✅ CRITICAL: Use hash instead of query parameter
+                window.location.hash = pageName;
                 
                 console.log('Page loaded successfully');
             } else {
@@ -809,24 +816,31 @@ generateFullHTML() {
             }
         }
         
-        // Handle back/forward buttons
-        window.addEventListener('popstate', function(e) {
-            if (e.state && e.state.page) {
-                loadPage(e.state.page);
+        // Handle hash changes (for back/forward buttons)
+        window.addEventListener('hashchange', function() {
+            const pageName = window.location.hash.replace('#', '');
+            if (pageName && pages[pageName]) {
+                // Don't call loadPage again to avoid infinite loop
+                document.getElementById('page-content').innerHTML = pages[pageName];
             }
         });
         
         // Make function available globally
         window.loadPage = loadPage;
+        window.pages = pages; // For debugging
         
-        // Load page from URL or default
+        // Load page from hash or default
         document.addEventListener('DOMContentLoaded', function() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const page = urlParams.get('page') || '${currentHtmlFile}' || 'index.html';
+            const pageName = window.location.hash.replace('#', '') || 
+                            '${currentHtmlFile}' || 'index.html';
             
-            // If not already on that page, load it
-            if (page !== '${currentHtmlFile}') {
-                loadPage(page);
+            console.log('Initial page:', pageName, 'Available pages:', Object.keys(pages));
+            
+            if (pages[pageName]) {
+                document.getElementById('page-content').innerHTML = pages[pageName];
+            } else if (pages['index.html']) {
+                // Fallback to index.html
+                document.getElementById('page-content').innerHTML = pages['index.html'];
             }
         });
         
@@ -836,6 +850,11 @@ generateFullHTML() {
         } catch (error) {
             console.error('JavaScript error:', error);
         }
+        
+        // Debug info
+        console.log('Project initialized');
+        console.log('Pages available:', Object.keys(pages));
+        console.log('Assets:', assets.length);
     </script>
 </body>
 </html>`;
