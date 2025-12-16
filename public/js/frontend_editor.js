@@ -773,57 +773,103 @@ class EnhancedFrontendEditor {
         };
         
         // Enhanced loadPage function
-        function loadPage(pageName) {
-            console.log('Loading page:', pageName);
-            
-            const html = projectData.html[pageName];
-            if (!html) {
-                document.getElementById('page-content').innerHTML = 
-                    '<div style="padding: 20px; border: 2px solid #f44336; border-radius: 5px;">' +
-                    '<h2>Page Not Found</h2>' +
-                    '<p>The page <strong>' + pageName + '</strong> was not found in this project.</p>' +
-                    '</div>';
-                return;
+function loadPage(pageName) {
+    console.log('Loading page:', pageName);
+    
+    const html = projectData.html[pageName];
+    if (!html) {
+        document.getElementById('page-content').innerHTML = 
+            '<div style="padding: 20px; border: 2px solid #f44336; border-radius: 5px;">' +
+            '<h2>Page Not Found</h2>' +
+            '<p>The page <strong>' + pageName + '</strong> was not found in this project.</p>' +
+            '</div>';
+        return;
+    }
+    
+    // Process the HTML (same as server-side processing)
+    let processedHtml = html
+        // Convert links
+        .replace(/<a\\s+(?:[^>]*?\\s+)?href=["']([^"']*\\.html)(?:#[^"']*)?["'][^>]*>/gi, 
+            (match, href) => {
+                const filename = href.split('/').pop();
+                const pageExists = projectData.html[filename];
+                if (pageExists) {
+                    return match.replace(
+                        \`href="\${href}"\`, 
+                        \`href="#" onclick="loadPage('\${filename}'); return false;"\`
+                    );
+                }
+                return match;
+            })
+        // Convert images
+        .replace(/<img[^>]*src=["']([^"']+)["'][^>]*>/gi, (match, src) => {
+            const filename = src.split('/').pop();
+            const asset = projectData.assets.find(a => a.name === filename);
+            if (asset) {
+                return match.replace(\`src="\${src}"\`, \`src="\${asset.data}"\`);
             }
-            
-            // Process the HTML (same as server-side processing)
-            let processedHtml = html
-                // Convert links
-                .replace(/<a\\s+(?:[^>]*?\\s+)?href=["']([^"']*\\.html)(?:#[^"']*)?["'][^>]*>/gi, 
-                    (match, href) => {
-                        const filename = href.split('/').pop();
-                        const pageExists = projectData.html[filename];
-                        if (pageExists) {
-                            return match.replace(
-                                \`href="\${href}"\`, 
-                                \`href="#" onclick="loadPage('\${filename}'); return false;"\`
-                            );
-                        }
-                        return match;
-                    })
-                // Convert images
-                .replace(/<img[^>]*src=["']([^"']+)["'][^>]*>/gi, (match, src) => {
-                    const filename = src.split('/').pop();
-                    const asset = projectData.assets.find(a => a.name === filename);
-                    if (asset) {
-                        return match.replace(\`src="\${src}"\`, \`src="\${asset.data}"\`);
-                    }
-                    return match;
-                });
-            
-            // Update content
-            document.getElementById('page-content').innerHTML = processedHtml;
-            
-            // Update URL
-            history.pushState({ page: pageName }, '', \`?page=\${pageName}\`);
-            
-            // Update auto-nav active state
-            document.querySelectorAll('.auto-nav a').forEach(link => {
-                link.style.fontWeight = link.getAttribute('onclick')?.includes(pageName) ? 'bold' : 'normal';
+            return match;
+        });
+    
+    // Update content
+    document.getElementById('page-content').innerHTML = processedHtml;
+    
+    // CRITICAL: Re-attach event listeners to newly loaded links
+    attachLinkListeners();
+    
+    // Update URL
+    history.pushState({ page: pageName }, '', \`?page=\${pageName}\`);
+    
+    // Update auto-nav active state
+    document.querySelectorAll('.auto-nav a').forEach(link => {
+        link.style.fontWeight = link.getAttribute('onclick')?.includes(pageName) ? 'bold' : 'normal';
+    });
+    
+    console.log('Page loaded successfully');
+}
+
+// Function to attach event listeners to links
+function attachLinkListeners() {
+    // Get all links in the page content
+    const links = document.querySelectorAll('#page-content a[href$=".html"]');
+    
+    links.forEach(link => {
+        const href = link.getAttribute('href');
+        if (href && href.endsWith('.html')) {
+            // Prevent default behavior
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                // Get the page name
+                const pageName = href.split('/').pop();
+                
+                // Check if page exists
+                if (projectData.html[pageName]) {
+                    loadPage(pageName);
+                } else {
+                    // If page doesn't exist, try to load as is
+                    console.warn('Page not found:', pageName);
+                }
             });
             
-            console.log('Page loaded successfully');
+            // Also add onclick attribute for good measure
+            link.setAttribute('onclick', 'return false;');
         }
+    });
+    
+    // Also handle images
+    const images = document.querySelectorAll('#page-content img');
+    images.forEach(img => {
+        const src = img.getAttribute('src');
+        if (src) {
+            const filename = src.split('/').pop();
+            const asset = projectData.assets.find(a => a.name === filename);
+            if (asset) {
+                img.src = asset.data;
+            }
+        }
+    });
+}
         
         // Handle browser navigation
         window.addEventListener('popstate', function(event) {
@@ -848,9 +894,14 @@ class EnhancedFrontendEditor {
         }
         
         // Initialize page
-        document.addEventListener('DOMContentLoaded', function() {
-            loadPage(initialPage);
-        });
+document.addEventListener('DOMContentLoaded', function() {
+    loadPage(initialPage);
+    
+    // Also attach listeners to initial content
+    setTimeout(() => {
+        attachLinkListeners();
+    }, 100);
+});
         
         // Also handle direct calls after load
         setTimeout(() => {
