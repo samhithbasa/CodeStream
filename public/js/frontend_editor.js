@@ -736,63 +736,48 @@ class EnhancedFrontendEditor {
                 });
             }
 
-            // Combine JS safely
+            // Combine JS
             let combinedJS = '';
             if (jsFiles) {
                 Object.values(jsFiles).forEach(js => {
                     if (js && typeof js === 'string') {
-                        // Properly escape for template literal
-                        const safeJS = js
-                            .replace(/\\/g, '\\\\')  // Escape backslashes first
-                            .replace(/`/g, '\\`')     // Escape backticks
-                            .replace(/\${/g, '\\${')  // Escape template expressions
-                            .replace(/\n/g, '\\n')    // Preserve newlines
-                            .replace(/\r/g, '\\r');   // Preserve carriage returns
-                        combinedJS += safeJS + '\n';  // Fixed: Use single backslash
+                        combinedJS += js + '\n';
                     }
                 });
             }
 
-            // Process ALL HTML files
-            const processedHtmlFiles = {};
-            Object.keys(htmlFiles).forEach(filename => {
-                let html = htmlFiles[filename];
+            // Process the current HTML file
+            let processedHTML = mainHTML;
 
-                // 1. Convert links to onclick handlers
-                html = html.replace(
-                    /<a\s+(?:[^>]*?\s+)?href=["']([^"']*\.html)(?:#[^"']*)?["'][^>]*>/gi,
-                    (match, href) => {
-                        const pageName = href.split('/').pop();
-                        if (htmlFiles[pageName]) {
-                            return match.replace(
-                                `href="${href}"`,
-                                `href="#" onclick="loadPage('${pageName}'); return false;"`
-                            );
-                        }
-                        return match;
+            // 1. Convert links to onclick handlers
+            processedHTML = processedHTML.replace(
+                /<a\s+(?:[^>]*?\s+)?href=["']([^"']*\.html)(?:#[^"']*)?["'][^>]*>/gi,
+                (match, href) => {
+                    const pageName = href.split('/').pop();
+                    if (htmlFiles[pageName]) {
+                        return match.replace(
+                            `href="${href}"`,
+                            `href="#" onclick="window.loadPage('${pageName}'); return false;"`
+                        );
                     }
-                );
-
-                // 2. Replace image sources with base64 data
-                if (this.assets && this.assets.length > 0) {
-                    this.assets.forEach(asset => {
-                        // Escape asset name for regex
-                        const escapedName = asset.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-                        // Replace src="filename.jpg"
-                        const regex1 = new RegExp(`src=["']([^"']*${escapedName})["']`, 'gi');
-                        html = html.replace(regex1, `src="${asset.data}"`);
-
-                        // Replace src='filename.jpg' (single quotes)
-                        const regex2 = new RegExp(`src=['"]([^'"]*${escapedName})['"]`, 'gi');
-                        html = html.replace(regex2, `src="${asset.data}"`);
-                    });
+                    return match;
                 }
+            );
 
-                processedHtmlFiles[filename] = html;
-            });
+            // 2. Replace ALL asset references - SIMPLE METHOD
+            if (this.assets && this.assets.length > 0) {
+                this.assets.forEach(asset => {
+                    // Simple string replacement (no regex escaping issues)
+                    // Replace src="filename.jpg"
+                    processedHTML = processedHTML.split(`src="${asset.name}"`).join(`src="${asset.data}"`);
+                    // Replace src='filename.jpg' (single quotes)
+                    processedHTML = processedHTML.split(`src='${asset.name}'`).join(`src="${asset.data}"`);
+                    // Replace href="filename.jpg" (for favicons, etc)
+                    processedHTML = processedHTML.split(`href="${asset.name}"`).join(`href="${asset.data}"`);
+                });
+            }
 
-            // Generate the final HTML
+            // Generate the HTML
             const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -834,12 +819,6 @@ class EnhancedFrontendEditor {
             padding: 20px;
         }
         
-        /* Make all .html links look clickable */
-        a[href$=".html"] {
-            cursor: pointer;
-            color: #0066cc;
-        }
-        
         ${combinedCSS}
     </style>
 </head>
@@ -855,77 +834,85 @@ class EnhancedFrontendEditor {
     ` : ''}
     
     <div id="page-content">
-        ${processedHtmlFiles[currentHtmlFile] || mainHTML}
+        ${processedHTML}
     </div>
 
     <script>
-        // ========== PROJECT DATA ==========
-        const projectData = {
-            html: ${JSON.stringify(processedHtmlFiles)},
-            assets: ${JSON.stringify(this.assets || [])},
-            allPages: ${JSON.stringify(allHtmlFiles)}
-        };
+        // ========== SIMPLE PAGE DATA ==========
+        const pages = ${JSON.stringify(htmlFiles)};
+        const assets = ${JSON.stringify(this.assets || [])};
         
-        console.log('📦 Project loaded:', {
-            pages: Object.keys(projectData.html),
-            assets: projectData.assets.length,
-            currentHash: window.location.hash
-        });
+        console.log('✅ Project loaded. Pages available:', Object.keys(pages));
         
-        // ========== LOAD PAGE FUNCTION ==========
+        // ========== SIMPLE LOAD PAGE FUNCTION ==========
         function loadPage(pageName) {
-            console.log('🔗 Loading page:', pageName);
+            console.log('📄 Loading page:', pageName);
             
-            // Check if page exists
-            if (!projectData.html[pageName]) {
-                console.error('❌ Page not found:', pageName);
+            if (pages[pageName]) {
+                let pageHTML = pages[pageName];
+                
+                // Process assets in the new page
+                assets.forEach(asset => {
+                    pageHTML = pageHTML
+                        .split('src="' + asset.name + '"').join('src="' + asset.data + '"')
+                        .split("src='" + asset.name + "'").join('src="' + asset.data + '"');
+                });
+                
+                // Process links in the new page
+                pageHTML = pageHTML.replace(
+                    /<a\\s+(?:[^>]*?\\s+)?href=["']([^"']*\\.html)(?:#[^"']*)?["'][^>]*>/gi,
+                    function(match, href) {
+                        const page = href.split('/').pop();
+                        if (pages[page]) {
+                            return match.replace(
+                                'href="' + href + '"',
+                                'href="#" onclick="loadPage(\\'' + page + '\\'); return false;"'
+                            );
+                        }
+                        return match;
+                    }
+                );
+                
+                document.getElementById('page-content').innerHTML = pageHTML;
+                window.location.hash = pageName;
+                console.log('✅ Page loaded:', pageName);
+            } else {
                 document.getElementById('page-content').innerHTML = 
-                    '<div style="padding: 20px; border: 2px solid red; color: red;">' +
-                    '<h2>Page Not Found</h2>' +
-                    '<p>The page <strong>' + pageName + '</strong> does not exist.</p>' +
-                    '</div>';
-                return;
+                    '<h2 style="color: red; padding: 20px;">Page not found: ' + pageName + '</h2>';
             }
-            
-            // Update content
-            document.getElementById('page-content').innerHTML = projectData.html[pageName];
-            
-            // Update URL hash (NO page reload!)
-            window.location.hash = pageName;
-            
-            console.log('✅ Page loaded:', pageName);
         }
         
         // ========== HASH CHANGE HANDLER ==========
         window.addEventListener('hashchange', function() {
             const pageName = window.location.hash.replace('#', '');
-            console.log('🔄 Hash changed to:', pageName);
-            
-            if (pageName && projectData.html[pageName]) {
-                // Load the page from hash
-                document.getElementById('page-content').innerHTML = projectData.html[pageName];
+            if (pageName && pages[pageName]) {
+                loadPage(pageName);
             }
         });
         
         // ========== INITIAL LOAD ==========
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('🚀 DOM loaded');
-            
-            // Get initial page from hash or use default
             const hash = window.location.hash.replace('#', '');
             const initialPage = hash || '${currentHtmlFile}' || 'index.html';
             
-            console.log('📄 Initial page:', initialPage);
+            console.log('📄 Loading initial page:', initialPage);
             
-            // Load the page
-            if (projectData.html[initialPage]) {
-                document.getElementById('page-content').innerHTML = projectData.html[initialPage];
+            if (pages[initialPage]) {
+                // Process assets for initial page
+                let initialHTML = pages[initialPage];
+                assets.forEach(asset => {
+                    initialHTML = initialHTML
+                        .split('src="' + asset.name + '"').join('src="' + asset.data + '"')
+                        .split("src='" + asset.name + "'").join('src="' + asset.data + '"');
+                });
+                
+                document.getElementById('page-content').innerHTML = initialHTML;
             }
         });
         
         // ========== GLOBAL ACCESS ==========
         window.loadPage = loadPage;
-        window.projectData = projectData; // For debugging
+        window.pages = pages; // For debugging
         
         // ========== RUN PROJECT JAVASCRIPT ==========
         try {
@@ -939,15 +926,12 @@ class EnhancedFrontendEditor {
 </body>
 </html>`;
 
-            // Clean up any invalid characters
-            const cleanHTML = html.replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
-
-            console.log('✅ HTML generated successfully, length:', cleanHTML.length);
-            return cleanHTML;
+            console.log('✅ HTML generated successfully, length:', html.length);
+            return html;
 
         } catch (error) {
             console.error('❌ Error in generateFullHTML:', error);
-            return '<!DOCTYPE html><html><head><title>Error</title></head><body><h1 style="color: red;">Error Generating Preview</h1><p>' + error.message + '</p><p>Check browser console for details.</p></body></html>';
+            return '<!DOCTYPE html><html><head><title>Error</title></head><body><h1 style="color: red;">Preview Error</h1><p>' + error.message + '</p><p>Check console for details.</p></body></html>';
         }
     }
 
