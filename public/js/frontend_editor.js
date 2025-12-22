@@ -44,36 +44,60 @@ class EnhancedFrontendEditor {
             const savedAssets = localStorage.getItem('frontendEditor_assets');
             if (savedAssets) {
                 const parsed = JSON.parse(savedAssets);
-                // Filter out any corrupted assets
-                this.assets = Array.isArray(parsed) ? parsed.filter(asset =>
-                    asset && asset.name && asset.data
-                ) : [];
-                console.log('Loaded assets from localStorage:', this.assets.length);
+
+                // Validate the parsed data structure
+                if (Array.isArray(parsed)) {
+                    this.assets = parsed.filter(asset =>
+                        asset &&
+                        typeof asset === 'object' &&
+                        asset.name &&
+                        asset.data &&
+                        typeof asset.name === 'string' &&
+                        typeof asset.data === 'string'
+                    );
+                    console.log(`Loaded ${this.assets.length} valid assets from localStorage`);
+                } else {
+                    console.warn('Invalid assets format in localStorage');
+                    this.assets = [];
+                    this.clearCorruptedStorage();
+                }
             }
         } catch (error) {
-            console.warn('Could not load assets from localStorage:', error);
-            this.assets = []; // Reset to empty array on error
+            console.error('Failed to load assets from localStorage:', error);
+            this.assets = [];
+            this.clearCorruptedStorage();
         }
     }
 
+    clearCorruptedStorage() {
+        try {
+            localStorage.removeItem('frontendEditor_assets');
+            console.log('Cleared corrupted localStorage data');
+        } catch (e) {
+            console.error('Failed to clear localStorage:', e);
+        }
+    }
+
+    // In your EnhancedFrontendEditor class init() method:
     init() {
         console.log('Init called');
-        console.log('generateFullHTML exists?', typeof this.generateFullHTML);
         this.bindEvents();
         this.updateFileTree();
-        this.loadAssetsFromLocalStorage(); // Load assets first
-        this.updatePreview();
+        this.loadAssetsFromLocalStorage();
         this.checkAuthStatus();
         this.setupAutoSave();
         this.setupHashNavigation();
 
-        // Ensure assets are displayed if assets manager is open
-        setTimeout(() => {
-            const assetsModal = document.getElementById('assets-modal');
-            if (assetsModal && assetsModal.style.display === 'block') {
-                this.renderAssetsList();
-            }
-        }, 100);
+        // Don't update preview here
+        // Wait for DOM to be fully ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                this.updatePreview();
+            });
+        } else {
+            // DOM already loaded
+            setTimeout(() => this.updatePreview(), 100);
+        }
     }
 
     /* ----------------------------------------------------
@@ -706,6 +730,18 @@ class EnhancedFrontendEditor {
         return processed;
     }
 
+    dataURLtoBlob(dataURL) {
+        const arr = dataURL.split(',');
+        const mime = arr[0].match(/:(.*?);/)[1];
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+        }
+        return new Blob([u8arr], { type: mime });
+    }
+
     generateFullHTML() {
         console.log('🚀 generateFullHTML called');
 
@@ -764,18 +800,23 @@ class EnhancedFrontendEditor {
                 }
             );
 
+
+
             // 2. Replace ALL asset references - SIMPLE METHOD
             if (this.assets && this.assets.length > 0) {
                 this.assets.forEach(asset => {
-                    // Simple string replacement (no regex escaping issues)
-                    // Replace src="filename.jpg"
-                    processedHTML = processedHTML.split(`src="${asset.name}"`).join(`src="${asset.data}"`);
-                    // Replace src='filename.jpg' (single quotes)
-                    processedHTML = processedHTML.split(`src='${asset.name}'`).join(`src="${asset.data}"`);
-                    // Replace href="filename.jpg" (for favicons, etc)
-                    processedHTML = processedHTML.split(`href="${asset.name}"`).join(`href="${asset.data}"`);
+                    // Create blob URLs for images
+                    if (asset.type && asset.type.startsWith('image/')) {
+                        const blob = this.dataURLtoBlob(asset.data);
+                        const blobUrl = URL.createObjectURL(blob);
+
+                        // Replace in HTML
+                        const regex = new RegExp(`src=["']${asset.name}["']`, 'gi');
+                        processedHTML = processedHTML.replace(regex, `src="${blobUrl}"`);
+                    }
                 });
             }
+
 
             // Generate the HTML
             const html = `<!DOCTYPE html>
