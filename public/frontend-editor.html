@@ -1,123 +1,131 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+<<head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple Frontend Playground</title>
+    <title>Advanced Frontend Playground</title>
     <link rel="stylesheet" href="/css/frontend_editor.css">
+    <!-- Add Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap"
+        rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/js-cookie@3.0.5/dist/js.cookie.min.js"></script>
-</head>
-<body>
-    <header class="frontend-header">
-        <div class="header-left">
-            <h1>🚀 Simple Frontend Playground</h1>
-        </div>
-        <div class="header-right">
-            <input type="text" id="project-name" placeholder="Project Name" value="My Simple Project">
-            <button id="save-project" class="btn btn-primary">
-                💾 Save & Get URL
-            </button>
-            
-            <!-- Dynamic Login/Logout Button -->
-            <button id="auth-toggle" class="btn btn-login">
-                🔐 Login
-            </button>
-        </div>
-    </header>
+    </head>
 
-    <div class="container">
-        <!-- File Explorer Sidebar (Hidden or Minimal) -->
-        <div class="file-explorer" style="display: none;">
-            <div class="explorer-header">
-                <h3>Simple Editor</h3>
+    <body>
+        <header class="frontend-header">
+            <div class="header-left">
+                <h1>🚀 Simple Frontend Playground</h1>
+            </div>
+            <div class="header-right">
+                <input type="text" id="project-name" placeholder="Project Name" value="My Simple Project">
+                <button id="save-project" class="btn btn-primary">
+                    💾 Save & Get URL
+                </button>
+
+                <!-- Dynamic Login/Logout Button -->
+                <button id="auth-toggle" class="btn btn-login">
+                    🔐 Login
+                </button>
+            </div>
+        </header>
+
+        <div class="container">
+            <!-- File Explorer Sidebar (Hidden or Minimal) -->
+            <div class="file-explorer" style="display: none;">
+                <div class="explorer-header">
+                    <h3>Simple Editor</h3>
+                </div>
+            </div>
+
+            <!-- Main Editor Area -->
+            <div class="editor-panel">
+                <div class="editor-tabs">
+                    <button class="tab-btn active" data-tab="html">HTML</button>
+                    <button class="tab-btn" data-tab="css">CSS</button>
+                    <button class="tab-btn" data-tab="js">JavaScript</button>
+                    <button class="tab-btn" data-tab="preview">Live Preview</button>
+                </div>
+
+                <div class="editor-content">
+                    <div class="tab-content active" id="html-tab">
+                        <div class="file-selector" style="display: none;">
+                            <select class="file-select">
+                                <option>index.html</option>
+                            </select>
+                        </div>
+                        <textarea id="html-editor" placeholder="Write your HTML here..."></textarea>
+                    </div>
+
+                    <div class="tab-content" id="css-tab">
+                        <div class="file-selector" style="display: none;">
+                            <select class="file-select">
+                                <option>style.css</option>
+                            </select>
+                        </div>
+                        <textarea id="css-editor" placeholder="Write your CSS here..."></textarea>
+                    </div>
+
+                    <div class="tab-content" id="js-tab">
+                        <div class="file-selector" style="display: none;">
+                            <select class="file-select">
+                                <option>script.js</option>
+                            </select>
+                        </div>
+                        <textarea id="js-editor" placeholder="Write your JavaScript here..."></textarea>
+                    </div>
+
+                    <div class="tab-content" id="preview-tab">
+                        <div class="preview-controls">
+                            <button id="refresh-preview" class="btn btn-small">🔄 Refresh</button>
+                        </div>
+                        <iframe id="preview-frame"></iframe>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- Main Editor Area -->
-        <div class="editor-panel">
-            <div class="editor-tabs">
-                <button class="tab-btn active" data-tab="html">HTML</button>
-                <button class="tab-btn" data-tab="css">CSS</button>
-                <button class="tab-btn" data-tab="js">JavaScript</button>
-                <button class="tab-btn" data-tab="preview">Live Preview</button>
-            </div>
-
-            <div class="editor-content">
-                <div class="tab-content active" id="html-tab">
-                    <div class="file-selector" style="display: none;">
-                        <select class="file-select">
-                            <option>index.html</option>
-                        </select>
-                    </div>
-                    <textarea id="html-editor" placeholder="Write your HTML here..."></textarea>
-                </div>
-
-                <div class="tab-content" id="css-tab">
-                    <div class="file-selector" style="display: none;">
-                        <select class="file-select">
-                            <option>style.css</option>
-                        </select>
-                    </div>
-                    <textarea id="css-editor" placeholder="Write your CSS here..."></textarea>
-                </div>
-
-                <div class="tab-content" id="js-tab">
-                    <div class="file-selector" style="display: none;">
-                        <select class="file-select">
-                            <option>script.js</option>
-                        </select>
-                    </div>
-                    <textarea id="js-editor" placeholder="Write your JavaScript here..."></textarea>
-                </div>
-
-                <div class="tab-content" id="preview-tab">
-                    <div class="preview-controls">
-                        <button id="refresh-preview" class="btn btn-small">🔄 Refresh</button>
-                    </div>
-                    <iframe id="preview-frame"></iframe>
-                </div>
-            </div>
+        <!-- Success Notification -->
+        <div id="success-notification" class="notification" style="display: none;">
+            <span>✓</span> Project saved! Share URL copied to clipboard.
         </div>
-    </div>
 
-    <!-- Success Notification -->
-    <div id="success-notification" class="notification" style="display: none;">
-        <span>✓</span> Project saved! Share URL copied to clipboard.
-    </div>
+        <!-- Simple Auth Script -->
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                const token = Cookies.get('token');
+                const authBtn = document.getElementById('auth-toggle');
 
-    <!-- Simple Auth Script -->
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const token = Cookies.get('token');
-            const authBtn = document.getElementById('auth-toggle');
-            
-            if (token) {
-                // User is logged in
-                if (authBtn) {
-                    authBtn.innerHTML = '🚪 Logout';
-                    authBtn.className = 'btn btn-logout';
+                if (token) {
+                    // User is logged in
+                    if (authBtn) {
+                        authBtn.innerHTML = '🚪 Logout';
+                        authBtn.className = 'btn btn-logout';
+                    }
+                } else {
+                    // User is not logged in
+                    if (authBtn) {
+                        authBtn.innerHTML = '🔐 Login';
+                        authBtn.className = 'btn btn-login';
+                    }
                 }
-            } else {
-                // User is not logged in
-                if (authBtn) {
-                    authBtn.innerHTML = '🔐 Login';
-                    authBtn.className = 'btn btn-login';
-                }
-            }
-            
-            // Handle Google OAuth redirect
-            const urlParams = new URLSearchParams(window.location.search);
-            const oauthToken = urlParams.get('token');
-            
-            if (oauthToken) {
-                Cookies.set('token', oauthToken, { expires: 7, path: '/' });
-                // Clean URL
-                window.history.replaceState({}, document.title, window.location.pathname);
-                window.location.reload();
-            }
-        });
-    </script>
 
-    <script src="/js/frontend_editor.js"></script>
-</body>
+                // Handle Google OAuth redirect
+                const urlParams = new URLSearchParams(window.location.search);
+                const oauthToken = urlParams.get('token');
+
+                if (oauthToken) {
+                    Cookies.set('token', oauthToken, { expires: 7, path: '/' });
+                    // Clean URL
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                    window.location.reload();
+                }
+            });
+        </script>
+
+        <script src="/js/frontend_editor.js"></script>
+    </body>
+
 </html>
