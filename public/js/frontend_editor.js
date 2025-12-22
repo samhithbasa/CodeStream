@@ -17,6 +17,7 @@ class EnhancedFrontendEditor {
             js: 'script.js'
         };
         this.isAuthenticated = false;
+        this.baseUrl = window.location.origin;
         this.init();
     }
 
@@ -78,9 +79,10 @@ class EnhancedFrontendEditor {
         }
     }
 
-    // In your EnhancedFrontendEditor class init() method:
     init() {
         console.log('Init called');
+        console.log('Base URL set to:', this.baseUrl);
+
         this.bindEvents();
         this.updateFileTree();
         this.loadAssetsFromLocalStorage();
@@ -88,16 +90,16 @@ class EnhancedFrontendEditor {
         this.setupAutoSave();
         this.setupHashNavigation();
 
-        // Don't update preview here
-        // Wait for DOM to be fully ready
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => {
-                this.updatePreview();
-            });
-        } else {
-            // DOM already loaded
-            setTimeout(() => this.updatePreview(), 100);
+        // Update preview after a short delay
+        setTimeout(() => this.updatePreview(), 300);
+    }
+
+    getProjectUrl(projectId) {
+        if (window.location.hostname === 'localhost' ||
+            window.location.hostname === '127.0.0.1') {
+            return `http://localhost:${window.location.port || 3000}/frontend/${projectId}`;
         }
+        return `https://${window.location.hostname}/frontend/${projectId}`;
     }
 
     /* ----------------------------------------------------
@@ -196,7 +198,7 @@ class EnhancedFrontendEditor {
     }
 
     /* ----------------------------------------------------
-       AUTH SYSTEM (ADDED)
+       AUTH SYSTEM
     ---------------------------------------------------- */
 
     async checkAuthStatus() {
@@ -315,9 +317,6 @@ class EnhancedFrontendEditor {
         }, 3000);
     }
 
-    /* ----------------------------------------------------
-       THE REST OF YOUR ORIGINAL EDITOR CODE (UNCHANGED)
-    ---------------------------------------------------- */
     setupEditorListeners() {
         const debounce = (func, delay) => {
             let timer;
@@ -497,7 +496,6 @@ class EnhancedFrontendEditor {
         nameInput.value = '';
     }
 
-    // NEW: addFile method (simple prompt-based add, used by sidebar buttons)
     addFile(type) {
         const fileName = prompt(`Enter ${type.toUpperCase()} file name:`);
         if (!fileName) return;
@@ -785,38 +783,29 @@ class EnhancedFrontendEditor {
             // Process the current HTML file
             let processedHTML = mainHTML;
 
-            // 1. Convert links to onclick handlers
-            processedHTML = processedHTML.replace(
-                /<a\s+(?:[^>]*?\s+)?href=["']([^"']*\.html)(?:#[^"']*)?["'][^>]*>/gi,
-                (match, href) => {
-                    const pageName = href.split('/').pop();
-                    if (htmlFiles[pageName]) {
-                        return match.replace(
-                            `href="${href}"`,
-                            `href="#" onclick="window.loadPage('${pageName}'); return false;"`
-                        );
-                    }
-                    return match;
-                }
-            );
-
-
-
-            // 2. Replace ALL asset references - SIMPLE METHOD
+            // Replace asset references with blob URLs
             if (this.assets && this.assets.length > 0) {
                 this.assets.forEach(asset => {
-                    // Create blob URLs for images
-                    if (asset.type && asset.type.startsWith('image/')) {
-                        const blob = this.dataURLtoBlob(asset.data);
-                        const blobUrl = URL.createObjectURL(blob);
+                    if (asset.data) {
+                        // Create blob URLs for images
+                        if (asset.type && asset.type.startsWith('image/')) {
+                            const blob = this.dataURLtoBlob(asset.data);
+                            const blobUrl = URL.createObjectURL(blob);
 
-                        // Replace in HTML
-                        const regex = new RegExp(`src=["']${asset.name}["']`, 'gi');
-                        processedHTML = processedHTML.replace(regex, `src="${blobUrl}"`);
+                            // Escape special regex characters in asset name
+                            const escapedAssetName = asset.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+                            // Replace src attributes
+                            const srcRegex = new RegExp(`src=["']([^"']*/)?${escapedAssetName}["']`, 'gi');
+                            processedHTML = processedHTML.replace(srcRegex, `src="${blobUrl}"`);
+
+                            // Replace href attributes
+                            const hrefRegex = new RegExp(`href=["']([^"']*/)?${escapedAssetName}["']`, 'gi');
+                            processedHTML = processedHTML.replace(hrefRegex, `href="${blobUrl}"`);
+                        }
                     }
                 });
             }
-
 
             // Generate the HTML
             const html = `<!DOCTYPE html>
@@ -885,7 +874,31 @@ class EnhancedFrontendEditor {
         
         console.log('✅ Project loaded. Pages available:', Object.keys(pages));
         
-        // ========== SIMPLE LOAD PAGE FUNCTION ==========
+        // Helper function to escape regex special characters
+        function escapeRegExp(string) {
+    return string.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
+}
+        
+        // Helper function to replace asset references in HTML
+        function replaceAssetInHTML(html, assetName, blobUrl) {
+            const escapedAssetName = escapeRegExp(assetName);
+            
+            // Pattern for src attributes (with or without path)
+            const srcPattern = new RegExp(\`src=["']([^"']*/)?\${escapedAssetName}["']\`, 'gi');
+            html = html.replace(srcPattern, \`src="\${blobUrl}"\`);
+            
+            // Pattern for href attributes (for CSS links, favicons, etc.)
+            const hrefPattern = new RegExp(\`href=["']([^"']*/)?\${escapedAssetName}["']\`, 'gi');
+            html = html.replace(hrefPattern, \`href="\${blobUrl}"\`);
+            
+            // Pattern for url() in CSS (background images, etc.)
+            const urlPattern = new RegExp(\`url\\\\\\(["']?([^"')]*/)?\${escapedAssetName}["']?\\\\\\)\`, 'gi');
+            html = html.replace(urlPattern, \`url("\${blobUrl}")\`);
+            
+            return html;
+        }
+        
+        // ========== LOAD PAGE FUNCTION ==========
         function loadPage(pageName) {
             console.log('📄 Loading page:', pageName);
             
@@ -893,21 +906,40 @@ class EnhancedFrontendEditor {
                 let pageHTML = pages[pageName];
                 
                 // Process assets in the new page
-                assets.forEach(asset => {
-                    pageHTML = pageHTML
-                        .split('src="' + asset.name + '"').join('src="' + asset.data + '"')
-                        .split("src='" + asset.name + "'").join('src="' + asset.data + '"');
-                });
+                if (assets && assets.length > 0) {
+                    assets.forEach(asset => {
+                        if (asset.data && asset.name) {
+                            try {
+                                const blob = dataURLtoBlob(asset.data);
+                                const blobUrl = URL.createObjectURL(blob);
+                                
+                                // Replace all occurrences of the asset name
+                                pageHTML = replaceAssetInHTML(pageHTML, asset.name, blobUrl);
+                                
+                                // Clean up blob URLs after a delay
+                                setTimeout(() => {
+                                    try {
+                                        URL.revokeObjectURL(blobUrl);
+                                    } catch (e) {
+                                        // ignore errors from revoking
+                                    }
+                                }, 5000);
+                            } catch (error) {
+                                console.error('Error processing asset:', asset.name, error);
+                            }
+                        }
+                    });
+                }
                 
                 // Process links in the new page
                 pageHTML = pageHTML.replace(
-                    /<a\\s+(?:[^>]*?\\s+)?href=["']([^"']*\\.html)(?:#[^"']*)?["'][^>]*>/gi,
+                    /<a\\\\s+(?:[^>]*?\\\\s+)?href=["']([^"']*\\\\.html)(?:#[^"']*)?["'][^>]*>/gi,
                     function(match, href) {
                         const page = href.split('/').pop();
                         if (pages[page]) {
                             return match.replace(
                                 'href="' + href + '"',
-                                'href="#" onclick="loadPage(\\'' + page + '\\'); return false;"'
+                                'href="#" onclick="loadPage(\\\\'' + page + '\\\\'); return false;"'
                             );
                         }
                         return match;
@@ -923,6 +955,39 @@ class EnhancedFrontendEditor {
             }
         }
         
+        // ========== DATA URL TO BLOB HELPER ==========
+        function dataURLtoBlob(dataURL) {
+            try {
+                if (!dataURL.startsWith('data:')) {
+                    return null;
+                }
+                
+                const arr = dataURL.split(',');
+                if (arr.length < 2) {
+                    throw new Error('Invalid data URL format');
+                }
+                
+                const mimeMatch = arr[0].match(/:(.*?);/);
+                if (!mimeMatch) {
+                    throw new Error('Invalid MIME type in data URL');
+                }
+                
+                const mime = mimeMatch[1];
+                const bstr = atob(arr[1]);
+                const n = bstr.length;
+                const u8arr = new Uint8Array(n);
+                
+                for (let i = 0; i < n; i++) {
+                    u8arr[i] = bstr.charCodeAt(i);
+                }
+                
+                return new Blob([u8arr], { type: mime });
+            } catch (error) {
+                console.error('Error converting data URL to blob:', error);
+                return null;
+            }
+        }
+        
         // ========== HASH CHANGE HANDLER ==========
         window.addEventListener('hashchange', function() {
             const pageName = window.location.hash.replace('#', '');
@@ -934,18 +999,26 @@ class EnhancedFrontendEditor {
         // ========== INITIAL LOAD ==========
         document.addEventListener('DOMContentLoaded', function() {
             const hash = window.location.hash.replace('#', '');
-            const initialPage = hash || '${currentHtmlFile}' || 'index.html';
+            const initialPage = hash && pages[hash] ? hash : '${currentHtmlFile}' || 'index.html';
             
             console.log('📄 Loading initial page:', initialPage);
             
             if (pages[initialPage]) {
                 // Process assets for initial page
                 let initialHTML = pages[initialPage];
-                assets.forEach(asset => {
-                    initialHTML = initialHTML
-                        .split('src="' + asset.name + '"').join('src="' + asset.data + '"')
-                        .split("src='" + asset.name + "'").join('src="' + asset.data + '"');
-                });
+                if (assets && assets.length > 0) {
+                    assets.forEach(asset => {
+                        if (asset.data && asset.name) {
+                            try {
+                                const blob = dataURLtoBlob(asset.data);
+                                const blobUrl = URL.createObjectURL(blob);
+                                initialHTML = replaceAssetInHTML(initialHTML, asset.name, blobUrl);
+                            } catch (error) {
+                                console.error('Error processing asset:', asset.name, error);
+                            }
+                        }
+                    });
+                }
                 
                 document.getElementById('page-content').innerHTML = initialHTML;
             }
@@ -953,7 +1026,7 @@ class EnhancedFrontendEditor {
         
         // ========== GLOBAL ACCESS ==========
         window.loadPage = loadPage;
-        window.pages = pages; // For debugging
+        window.pages = pages;
         
         // ========== RUN PROJECT JAVASCRIPT ==========
         try {
@@ -994,9 +1067,6 @@ class EnhancedFrontendEditor {
             }
         });
     }
-    /* ----------------------------------------------------
-    PREVIEW CONTROLS - MISSING METHODS
-    ---------------------------------------------------- */
 
     toggleFullscreenPreview() {
         const previewFrame = document.getElementById('preview-frame');
@@ -1063,10 +1133,6 @@ class EnhancedFrontendEditor {
         setTimeout(() => this.updatePreview(), 100);
     }
 
-    /* ---------------------------------------------
-       PROJECT SAVE / LOAD
-    --------------------------------------------- */
-
     async saveProject() {
         const token = Cookies.get('token');
         if (!token) {
@@ -1121,7 +1187,8 @@ class EnhancedFrontendEditor {
             const result = await response.json();
 
             if (result.success) {
-                this.showSuccessNotification(result.shareUrl);
+                const shareUrl = this.getProjectUrl(result.projectId);
+                this.showSuccessNotification(shareUrl);
                 if (saveBtn) saveBtn.innerHTML = '✅ Saved!';
                 setTimeout(() => {
                     if (saveBtn) saveBtn.innerHTML = originalText;
@@ -1205,12 +1272,12 @@ class EnhancedFrontendEditor {
         if (!list) return;
 
         if (!projects || projects.length === 0) {
-            list.innerHTML = `< p style = "text-align:center;padding:20px;color:#666;" > No projects found.Create your first project!</p > `;
+            list.innerHTML = `<p style="text-align:center;padding:20px;color:#666;">No projects found. Create your first project!</p>`;
             return;
         }
 
         list.innerHTML = projects.map(p => `
-                < div class="project-item" >
+                <div class="project-item">
                 <div class="project-info">
                     <h3>${this.escapeHtml(p.name || 'Untitled Project')}</h3>
                     <p class="project-meta">
@@ -1230,7 +1297,7 @@ class EnhancedFrontendEditor {
                     <button class="btn btn-open" onclick="frontendEditor.openProject('${p.id}')">Open</button>
                     <button class="btn btn-delete" onclick="frontendEditor.deleteProject('${p.id}','${p.name || 'Untitled'}')">Delete</button>
                 </div>
-            </div >
+            </div>
                 `).join('');
     }
 
@@ -1248,7 +1315,7 @@ class EnhancedFrontendEditor {
             const token = Cookies.get('token');
             const headers = token ? { 'Authorization': `Bearer ${token} ` } : {};
 
-            const response = await fetch(`/ api / frontend / project / ${projectId} `, {
+            const response = await fetch(`/api/frontend/project/${projectId}`, {
                 headers: headers
             });
 
@@ -1311,7 +1378,7 @@ class EnhancedFrontendEditor {
         if (!confirm(`Delete ${name}?`)) return;
 
         try {
-            const res = await fetch(`/ api / frontend / project / ${id} `, {
+            const res = await fetch(`/api/frontend/project/${id}`, {
                 method: "DELETE",
                 headers: { 'Authorization': `Bearer ${token} ` }
             });
@@ -1342,7 +1409,6 @@ class EnhancedFrontendEditor {
             .replace(/'/g, "&#039;");
     }
 
-    // Debug method for testing
     async debugProjectSystem() {
         console.log('=== PROJECT SYSTEM DEBUG ===');
 
@@ -1360,7 +1426,6 @@ class EnhancedFrontendEditor {
         console.log('Current Files:', this.files);
         console.log('Current Assets:', this.assets);
     }
-
 }
 
 // Debug: List all methods in the class
@@ -1373,4 +1438,3 @@ console.log('Class prototype methods:',
 document.addEventListener('DOMContentLoaded', () => {
     window.frontendEditor = new EnhancedFrontendEditor();
 });
-

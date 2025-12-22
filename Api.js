@@ -1102,7 +1102,7 @@ function generateDeployedHTML(projectData) {
         console.log('[DEBUG] Using pre-generated deployment HTML');
         return projectData.deploymentHTML;
     }
-    
+
     console.log('[DEBUG] Generating HTML from scratch');
 
     // Safe access to files with fallbacks
@@ -1369,45 +1369,89 @@ app.get('/frontend/:projectId/:filename', (req, res) => {
     }
 });
 
+// Update the /frontend/:id route to properly handle navigation:
 app.get('/frontend/:id', (req, res) => {
     try {
         const projectId = req.params.id;
 
-        // Safety check: if it looks like a filename, return 404
-        if (projectId.endsWith('.js') || projectId.endsWith('.css')) {
-            console.log(`[DEBUG] Blocking file request: ${projectId}`);
-            return res.status(404).send('File not found.');
+        // Handle page requests within projects
+        if (projectId.endsWith('.html')) {
+            // This is a page request, extract project ID from referrer or query param
+            const refProjectId = req.query.projectId ||
+                req.headers.referer?.split('/').pop() ||
+                projectId.replace('.html', '');
+
+            const projectPath = path.join(FRONTEND_STORAGE_DIR, `${refProjectId}.json`);
+
+            if (fs.existsSync(projectPath)) {
+                const projectData = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
+
+                // Find the requested page
+                const pageName = projectId;
+                if (projectData.files?.html?.[pageName]) {
+                    const htmlContent = projectData.files.html[pageName];
+
+                    // Generate proper HTML with navigation
+                    const fullHtml = `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>${projectData.name} - ${pageName}</title>
+                        <base href="/frontend/${refProjectId}/">
+                    </head>
+                    <body>
+                        <nav style="background:#f5f5f5;padding:10px;">
+                            <a href="/frontend/${refProjectId}">← Back to Home</a>
+                        </nav>
+                        ${htmlContent}
+                    </body>
+                    </html>`;
+
+                    return res.send(fullHtml);
+                }
+            }
         }
 
+        // Original project loading logic continues...
         const projectPath = path.join(FRONTEND_STORAGE_DIR, `${projectId}.json`);
 
-        console.log(`[DEBUG] Loading project: ${projectId}`);
-        console.log(`[DEBUG] Project path: ${projectPath}`);
-
-        if (!fs.existsSync(projectPath) && projectId.endsWith('.html')) {
-            // Extract project ID from referrer or use fallback
-            console.log(`[DEBUG] Page request: ${projectId}, serving main project`);
-            // Find the project somehow or serve default
+        if (!fs.existsSync(projectPath)) {
+            return res.status(404).send(`
+                <html>
+                    <body>
+                        <h1>Project Not Found</h1>
+                        <p>The requested project (${projectId}) does not exist.</p>
+                        <a href="/frontend-editor">Create a new project</a>
+                    </body>
+                </html>
+            `);
         }
 
         const projectData = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
-        console.log(`[DEBUG] Project data loaded:`, {
-            name: projectData.name,
-            hasFiles: !!projectData.files,
-            hasAssets: !!projectData.assets,
-            filesStructure: projectData.files ? Object.keys(projectData.files) : 'No files'
-        });
 
-        const htmlContent = generateDeployedHTML(projectData);
+        // Add base URL to the generated HTML for proper asset resolution
+        const originalHtml = generateDeployedHTML(projectData);
+        const htmlWithBase = originalHtml.replace(
+            '<head>',
+            `<head>\n    <base href="/frontend/${projectId}/">`
+        );
 
-        console.log(`[DEBUG] Generated HTML content length: ${htmlContent.length}`);
-        res.send(htmlContent);
+        res.send(htmlWithBase);
 
     } catch (error) {
         console.error('Error serving frontend project:', error);
-        console.error('Error stack:', error.stack);
         res.status(500).send('Error loading project: ' + error.message);
     }
+});
+
+// Simple health check for Railway
+app.get('/health', (req, res) => {
+    res.json({
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        service: 'code-editor',
+        version: '1.0.0'
+    });
 });
 
 
