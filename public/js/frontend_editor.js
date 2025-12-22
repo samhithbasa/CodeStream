@@ -770,12 +770,17 @@ class EnhancedFrontendEditor {
                 });
             }
 
-            // Combine JS
+            // Combine JS - escape for insertion into script tag
             let combinedJS = '';
             if (jsFiles) {
                 Object.values(jsFiles).forEach(js => {
                     if (js && typeof js === 'string') {
-                        combinedJS += js + '\n';
+                        // Escape script tags to prevent breaking out of script block
+                        const safeJS = js
+                            .replace(/<\/script>/gi, '<\\/script>')
+                            .replace(/`/g, '\\`')
+                            .replace(/\${/g, '\\${');
+                        combinedJS += safeJS + '\n';
                     }
                 });
             }
@@ -868,175 +873,47 @@ class EnhancedFrontendEditor {
     </div>
 
     <script>
-        // ========== SIMPLE PAGE DATA ==========
-        const pages = ${JSON.stringify(htmlFiles)};
-        const assets = ${JSON.stringify(this.assets || [])};
-        
-        console.log('✅ Project loaded. Pages available:', Object.keys(pages));
-        
-        // Helper function to escape regex special characters
-        function escapeRegExp(string) {
-    return string.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
-}
-        
-        // Helper function to replace asset references in HTML
-        function replaceAssetInHTML(html, assetName, blobUrl) {
-            const escapedAssetName = escapeRegExp(assetName);
+    // ULTRA SIMPLE VERSION - No regex complexity
+    const pages = ${JSON.stringify(htmlFiles)};
+    const assets = ${JSON.stringify(this.assets || [])};
+    
+    function loadPage(pageName) {
+        if (pages[pageName]) {
+            let pageHTML = pages[pageName];
             
-            // Pattern for src attributes (with or without path)
-            const srcPattern = new RegExp(\`src=["']([^"']*/)?\${escapedAssetName}["']\`, 'gi');
-            html = html.replace(srcPattern, \`src="\${blobUrl}"\`);
-            
-            // Pattern for href attributes (for CSS links, favicons, etc.)
-            const hrefPattern = new RegExp(\`href=["']([^"']*/)?\${escapedAssetName}["']\`, 'gi');
-            html = html.replace(hrefPattern, \`href="\${blobUrl}"\`);
-            
-            // Pattern for url() in CSS (background images, etc.)
-            const urlPattern = new RegExp(\`url\\\\\\(["']?([^"')]*/)?\${escapedAssetName}["']?\\\\\\)\`, 'gi');
-            html = html.replace(urlPattern, \`url("\${blobUrl}")\`);
-            
-            return html;
-        }
-        
-        // ========== LOAD PAGE FUNCTION ==========
-        function loadPage(pageName) {
-            console.log('📄 Loading page:', pageName);
-            
-            if (pages[pageName]) {
-                let pageHTML = pages[pageName];
-                
-                // Process assets in the new page
-                if (assets && assets.length > 0) {
-                    assets.forEach(asset => {
-                        if (asset.data && asset.name) {
-                            try {
-                                const blob = dataURLtoBlob(asset.data);
-                                const blobUrl = URL.createObjectURL(blob);
-                                
-                                // Replace all occurrences of the asset name
-                                pageHTML = replaceAssetInHTML(pageHTML, asset.name, blobUrl);
-                                
-                                // Clean up blob URLs after a delay
-                                setTimeout(() => {
-                                    try {
-                                        URL.revokeObjectURL(blobUrl);
-                                    } catch (e) {
-                                        // ignore errors from revoking
-                                    }
-                                }, 5000);
-                            } catch (error) {
-                                console.error('Error processing asset:', asset.name, error);
-                            }
+            // Simple asset replacement - string methods only
+            if (assets) {
+                assets.forEach(asset => {
+                    if (asset.data && asset.name) {
+                        // Replace all occurrences
+                        while (pageHTML.includes('src="' + asset.name + '"')) {
+                            pageHTML = pageHTML.replace('src="' + asset.name + '"', 'src="' + asset.data + '"');
                         }
-                    });
-                }
-                
-                // Process links in the new page
-                pageHTML = pageHTML.replace(
-                    /<a\\\\s+(?:[^>]*?\\\\s+)?href=["']([^"']*\\\\.html)(?:#[^"']*)?["'][^>]*>/gi,
-                    function(match, href) {
-                        const page = href.split('/').pop();
-                        if (pages[page]) {
-                            return match.replace(
-                                'href="' + href + '"',
-                                'href="#" onclick="loadPage(\\\\'' + page + '\\\\'); return false;"'
-                            );
+                        while (pageHTML.includes("src='" + asset.name + "'")) {
+                            pageHTML = pageHTML.replace("src='" + asset.name + "'", 'src="' + asset.data + '"');
                         }
-                        return match;
                     }
-                );
-                
-                document.getElementById('page-content').innerHTML = pageHTML;
-                window.location.hash = pageName;
-                console.log('✅ Page loaded:', pageName);
-            } else {
-                document.getElementById('page-content').innerHTML = 
-                    '<h2 style="color: red; padding: 20px;">Page not found: ' + pageName + '</h2>';
+                });
             }
-        }
-        
-        // ========== DATA URL TO BLOB HELPER ==========
-        function dataURLtoBlob(dataURL) {
-            try {
-                if (!dataURL.startsWith('data:')) {
-                    return null;
-                }
-                
-                const arr = dataURL.split(',');
-                if (arr.length < 2) {
-                    throw new Error('Invalid data URL format');
-                }
-                
-                const mimeMatch = arr[0].match(/:(.*?);/);
-                if (!mimeMatch) {
-                    throw new Error('Invalid MIME type in data URL');
-                }
-                
-                const mime = mimeMatch[1];
-                const bstr = atob(arr[1]);
-                const n = bstr.length;
-                const u8arr = new Uint8Array(n);
-                
-                for (let i = 0; i < n; i++) {
-                    u8arr[i] = bstr.charCodeAt(i);
-                }
-                
-                return new Blob([u8arr], { type: mime });
-            } catch (error) {
-                console.error('Error converting data URL to blob:', error);
-                return null;
-            }
-        }
-        
-        // ========== HASH CHANGE HANDLER ==========
-        window.addEventListener('hashchange', function() {
-            const pageName = window.location.hash.replace('#', '');
-            if (pageName && pages[pageName]) {
-                loadPage(pageName);
-            }
-        });
-        
-        // ========== INITIAL LOAD ==========
-        document.addEventListener('DOMContentLoaded', function() {
-            const hash = window.location.hash.replace('#', '');
-            const initialPage = hash && pages[hash] ? hash : '${currentHtmlFile}' || 'index.html';
             
-            console.log('📄 Loading initial page:', initialPage);
-            
-            if (pages[initialPage]) {
-                // Process assets for initial page
-                let initialHTML = pages[initialPage];
-                if (assets && assets.length > 0) {
-                    assets.forEach(asset => {
-                        if (asset.data && asset.name) {
-                            try {
-                                const blob = dataURLtoBlob(asset.data);
-                                const blobUrl = URL.createObjectURL(blob);
-                                initialHTML = replaceAssetInHTML(initialHTML, asset.name, blobUrl);
-                            } catch (error) {
-                                console.error('Error processing asset:', asset.name, error);
-                            }
-                        }
-                    });
-                }
-                
-                document.getElementById('page-content').innerHTML = initialHTML;
-            }
-        });
-        
-        // ========== GLOBAL ACCESS ==========
-        window.loadPage = loadPage;
-        window.pages = pages;
-        
-        // ========== RUN PROJECT JAVASCRIPT ==========
-        try {
-            ${combinedJS}
-        } catch (error) {
-            console.error('❌ JavaScript error:', error);
+            document.getElementById('page-content').innerHTML = pageHTML;
+            window.location.hash = pageName;
         }
-        
-        console.log('🎉 Project initialization complete!');
-    </script>
+    }
+    
+    // Make function available
+    window.loadPage = loadPage;
+    
+    // Load initial page
+    document.addEventListener('DOMContentLoaded', function() {
+        const initialPage = '${currentHtmlFile}' || 'index.html';
+        if (pages[initialPage]) {
+            loadPage(initialPage);
+        }
+    });
+    
+    ${combinedJS}
+</script>
 </body>
 </html>`;
 
