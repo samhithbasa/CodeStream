@@ -4,553 +4,155 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>⚡ CodeCanvas - Frontend Playground</title>
+    <title>Advanced Frontend Playground</title>
     <link rel="stylesheet" href="/css/frontend_editor.css">
     <script src="https://cdn.jsdelivr.net/npm/js-cookie@3.0.5/dist/js.cookie.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 
-<body class="night-theme">
+<body>
     <header class="frontend-header">
         <div class="header-left">
-            <div class="logo">
-                <i class="fas fa-code"></i>
-                <h1>CodeCanvas</h1>
-                <span class="tagline">Real-time Frontend Playground</span>
-            </div>
+            <h1>🚀 Advanced Frontend Playground</h1>
         </div>
         <div class="header-right">
-            <div class="project-info">
-                <input type="text" id="project-name" placeholder="Untitled Project">
-                <span class="project-status" id="project-status">
-                    <i class="fas fa-circle"></i> Auto-saving
-                </span>
-            </div>
-            <div class="header-actions">
-                <button id="assets-manager" class="btn btn-icon" title="Assets">
-                    <i class="fas fa-images"></i>
-                </button>
-                <button id="show-projects" class="btn btn-icon" title="My Projects">
-                    <i class="fas fa-folder"></i>
-                </button>
-                <button id="save-project" class="btn btn-primary btn-glow">
-                    <i class="fas fa-rocket"></i>
-                    <span>Deploy</span>
-                </button>
-                <button id="auth-toggle" class="btn btn-auth">
-                    <i class="fas fa-user"></i>
-                    <span>Login</span>
-                </button>
-            </div>
+            <input type="text" id="project-name" placeholder="Project Name">
+            <button id="save-project" class="btn btn-primary">
+                💾 Save & Deploy
+            </button>
+            <button id="show-projects" class="btn btn-secondary">My Projects</button>
+            <button id="assets-manager" class="btn btn-secondary">📁 Assets</button>
+
+            <!-- Dynamic Login/Logout Toggle Button -->
+            <button id="auth-toggle" class="btn btn-login">
+                🔐 Login
+            </button>
         </div>
     </header>
 
     <div class="container">
-        <!-- Sidebar (File Status) -->
-        <div class="sidebar">
-            <div class="sidebar-header">
-                <h3><i class="fas fa-file-code"></i> Project Files</h3>
-                <div class="file-stats">
-                    <span class="stat-item">
-                        <i class="fas fa-code"></i>
-                        <span id="html-stats">HTML</span>
-                    </span>
-                    <span class="stat-item">
-                        <i class="fas fa-palette"></i>
-                        <span id="css-stats">CSS</span>
-                    </span>
-                    <span class="stat-item">
-                        <i class="fas fa-bolt"></i>
-                        <span id="js-stats">JS</span>
-                    </span>
-                </div>
+        <!-- File Explorer Sidebar -->
+        <div class="file-explorer">
+            <div class="explorer-header">
+                <h3>Project Files</h3>
+                <button id="add-file" class="btn btn-small">+ New File</button>
             </div>
-            
-            <div class="file-status">
-                <div class="status-item active">
-                    <div class="status-icon">
-                        <i class="fab fa-html5"></i>
-                    </div>
-                    <div class="status-info">
-                        <div class="file-name">index.html</div>
-                        <div class="file-size" id="html-size">0 chars</div>
-                    </div>
-                    <div class="status-indicator"></div>
-                </div>
-                
-                <div class="status-item">
-                    <div class="status-icon">
-                        <i class="fab fa-css3-alt"></i>
-                    </div>
-                    <div class="status-info">
-                        <div class="file-name">style.css</div>
-                        <div class="file-size" id="css-size">0 chars</div>
-                    </div>
-                    <div class="status-indicator"></div>
-                </div>
-                
-                <div class="status-item">
-                    <div class="status-icon">
-                        <i class="fab fa-js"></i>
-                    </div>
-                    <div class="status-info">
-                        <div class="file-name">script.js</div>
-                        <div class="file-size" id="js-size">0 chars</div>
-                    </div>
-                    <div class="status-indicator"></div>
-                </div>
-            </div>
-            
-            <div class="quick-actions">
-                <button class="quick-btn" onclick="frontendEditor.updatePreview()">
-                    <i class="fas fa-sync-alt"></i>
-                    Refresh Preview
-                </button>
-                <button class="quick-btn" onclick="frontendEditor.clearAll()">
-                    <i class="fas fa-trash-alt"></i>
-                    Clear All
-                </button>
-            </div>
-            
-            <div class="preview-size-selector">
-                <h4><i class="fas fa-expand-alt"></i> Preview Size</h4>
-                <div class="size-buttons">
-                    <button class="size-btn active" data-size="desktop">
-                        <i class="fas fa-desktop"></i>
-                    </button>
-                    <button class="size-btn" data-size="tablet">
-                        <i class="fas fa-tablet-alt"></i>
-                    </button>
-                    <button class="size-btn" data-size="mobile">
-                        <i class="fas fa-mobile-alt"></i>
-                    </button>
-                    <button class="size-btn" data-size="responsive">
-                        <i class="fas fa-expand"></i>
-                    </button>
-                </div>
+            <div class="file-tree" id="file-tree">
+                <!-- Files will be populated here -->
             </div>
         </div>
 
         <!-- Main Editor Area -->
-        <div class="main-editor">
+        <div class="editor-panel">
             <div class="editor-tabs">
-                <div class="tab-buttons">
-                    <button class="tab-btn active" data-tab="html">
-                        <i class="fab fa-html5"></i>
-                        <span>HTML</span>
-                    </button>
-                    <button class="tab-btn" data-tab="css">
-                        <i class="fab fa-css3-alt"></i>
-                        <span>CSS</span>
-                    </button>
-                    <button class="tab-btn" data-tab="js">
-                        <i class="fab fa-js"></i>
-                        <span>JavaScript</span>
-                    </button>
-                    <button class="tab-btn" data-tab="preview">
-                        <i class="fas fa-eye"></i>
-                        <span>Preview</span>
-                    </button>
-                </div>
-                
-                <div class="tab-actions">
-                    <button class="tab-action-btn" id="fullscreen-preview" title="Fullscreen">
-                        <i class="fas fa-expand"></i>
-                    </button>
-                    <button class="tab-action-btn" onclick="frontendEditor.copyCode()" title="Copy Code">
-                        <i class="fas fa-copy"></i>
-                    </button>
-                </div>
+                <button class="tab-btn active" data-tab="html">HTML</button>
+                <button class="tab-btn" data-tab="css">CSS</button>
+                <button class="tab-btn" data-tab="js">JavaScript</button>
+                <button class="tab-btn" data-tab="preview">Live Preview</button>
             </div>
-            
+
             <div class="editor-content">
-                <!-- HTML Editor -->
                 <div class="tab-content active" id="html-tab">
-                    <div class="editor-container">
-                        <div class="editor-header">
-                            <div class="editor-title">
-                                <i class="fab fa-html5"></i>
-                                <span>index.html</span>
-                            </div>
-                            <div class="editor-stats">
-                                <span id="html-lines">1 line</span>
-                                <span id="html-chars">0 chars</span>
-                            </div>
-                        </div>
-                        <textarea id="html-editor" class="code-editor" spellcheck="false">&lt;!DOCTYPE html&gt;
-&lt;html lang="en"&gt;
+                    <div class="file-selector">
+                        <select id="html-file-selector" class="file-select">
+                            <option value="index.html">index.html</option>
+                        </select>
+                        <button class="btn btn-small" id="add-html-file">+</button>
+                    </div>
+                    <textarea id="html-editor" placeholder="Write your HTML here...">&lt;!DOCTYPE html&gt;
+&lt;html&gt;
 &lt;head&gt;
-    &lt;meta charset="UTF-8"&gt;
-    &lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;
-    &lt;title&gt;My Awesome Project&lt;/title&gt;
+    &lt;title&gt;My Project&lt;/title&gt;
 &lt;/head&gt;
 &lt;body&gt;
-    &lt;div class="container"&gt;
-        &lt;h1 class="title"&gt;🚀 Welcome to CodeCanvas!&lt;/h1&gt;
-        &lt;p class="subtitle"&gt;Edit this code and see live preview&lt;/p&gt;
-        
-        &lt;div class="demo-card"&gt;
-            &lt;h3&gt;&lt;i class="fas fa-magic"&gt;&lt;/i&gt; Live Preview&lt;/h3&gt;
-            &lt;p&gt;Change any code and see instant results&lt;/p&gt;
-            &lt;button class="btn-demo" onclick="showDemo()"&gt;
-                &lt;i class="fas fa-play"&gt;&lt;/i&gt; Click Me
-            &lt;/button&gt;
-        &lt;/div&gt;
-        
-        &lt;div class="features"&gt;
-            &lt;div class="feature"&gt;
-                &lt;i class="fas fa-bolt"&gt;&lt;/i&gt;
-                &lt;h4&gt;Real-time&lt;/h4&gt;
-                &lt;p&gt;See changes instantly&lt;/p&gt;
-            &lt;/div&gt;
-            &lt;div class="feature"&gt;
-                &lt;i class="fas fa-cloud-upload-alt"&gt;&lt;/i&gt;
-                &lt;h4&gt;Deploy&lt;/h4&gt;
-                &lt;p&gt;One-click hosting&lt;/p&gt;
-            &lt;/div&gt;
-            &lt;div class="feature"&gt;
-                &lt;i class="fas fa-share-alt"&gt;&lt;/i&gt;
-                &lt;h4&gt;Share&lt;/h4&gt;
-                &lt;p&gt;Share with anyone&lt;/p&gt;
-            &lt;/div&gt;
-        &lt;/div&gt;
-    &lt;/div&gt;
+    &lt;h1&gt;Hello World!&lt;/h1&gt;
+    &lt;p&gt;Start building your amazing project...&lt;/p&gt;
+    &lt;button onclick="showAlert()"&gt;Click Me!&lt;/button&gt;
 &lt;/body&gt;
 &lt;/html&gt;</textarea>
-                    </div>
                 </div>
-                
-                <!-- CSS Editor -->
+
                 <div class="tab-content" id="css-tab">
-                    <div class="editor-container">
-                        <div class="editor-header">
-                            <div class="editor-title">
-                                <i class="fab fa-css3-alt"></i>
-                                <span>style.css</span>
-                            </div>
-                            <div class="editor-stats">
-                                <span id="css-lines">1 line</span>
-                                <span id="css-chars">0 chars</span>
-                            </div>
-                        </div>
-                        <textarea id="css-editor" class="code-editor" spellcheck="false">/* Night Theme Styles */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-body {
-    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-    background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
-    color: #e0e0ff;
-    min-height: 100vh;
-    padding: 20px;
-}
-
-.container {
-    max-width: 1200px;
+                    <div class="file-selector">
+                        <select id="css-file-selector" class="file-select">
+                            <option value="style.css">style.css</option>
+                        </select>
+                        <button class="btn btn-small" onclick="frontendEditor.addFile('css')">+</button>
+                    </div>
+                    <textarea id="css-editor" placeholder="Write your CSS here...">body {
+    font-family: Arial, sans-serif;
+    max-width: 800px;
     margin: 0 auto;
-    padding: 40px 20px;
+    padding: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    min-height: 100vh;
 }
 
-.title {
-    font-size: 3.5rem;
-    background: linear-gradient(90deg, #667eea, #764ba2);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    margin-bottom: 20px;
+h1 {
     text-align: center;
-    font-weight: 800;
-    letter-spacing: -0.5px;
+    margin-bottom: 30px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
 }
 
-.subtitle {
-    text-align: center;
-    font-size: 1.2rem;
-    color: #a0a0ff;
-    margin-bottom: 50px;
-    opacity: 0.9;
-}
-
-.demo-card {
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(10px);
-    border-radius: 20px;
-    padding: 40px;
-    margin: 40px auto;
-    max-width: 600px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-    transition: transform 0.3s ease;
-}
-
-.demo-card:hover {
-    transform: translateY(-5px);
-}
-
-.demo-card h3 {
-    font-size: 1.8rem;
-    margin-bottom: 15px;
-    color: #ffffff;
-}
-
-.demo-card p {
-    color: #b0b0ff;
-    margin-bottom: 25px;
-    font-size: 1.1rem;
-    line-height: 1.6;
-}
-
-.btn-demo {
-    background: linear-gradient(135deg, #667eea, #764ba2);
+button {
+    background: #ff6b6b;
     color: white;
     border: none;
-    padding: 15px 40px;
-    border-radius: 50px;
-    font-size: 1.1rem;
+    padding: 12px 24px;
+    border-radius: 25px;
     cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    font-weight: 600;
+    font-size: 16px;
     transition: all 0.3s ease;
 }
 
-.btn-demo:hover {
+button:hover {
+    background: #ff5252;
     transform: translateY(-2px);
-    box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
-}
-
-.features {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 30px;
-    margin-top: 60px;
-}
-
-.feature {
-    background: rgba(255, 255, 255, 0.03);
-    border-radius: 15px;
-    padding: 30px;
-    text-align: center;
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    transition: all 0.3s ease;
-}
-
-.feature:hover {
-    background: rgba(255, 255, 255, 0.05);
-    transform: translateY(-5px);
-}
-
-.feature i {
-    font-size: 2.5rem;
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    margin-bottom: 15px;
-}
-
-.feature h4 {
-    font-size: 1.4rem;
-    margin-bottom: 10px;
-    color: #ffffff;
-}
-
-.feature p {
-    color: #a0a0ff;
-    font-size: 1rem;
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-    .title {
-        font-size: 2.5rem;
-    }
-    
-    .demo-card {
-        padding: 30px 20px;
-    }
-    
-    .features {
-        grid-template-columns: 1fr;
-    }
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
 }</textarea>
-                    </div>
                 </div>
-                
-                <!-- JavaScript Editor -->
+
                 <div class="tab-content" id="js-tab">
-                    <div class="editor-container">
-                        <div class="editor-header">
-                            <div class="editor-title">
-                                <i class="fab fa-js"></i>
-                                <span>script.js</span>
-                            </div>
-                            <div class="editor-stats">
-                                <span id="js-lines">1 line</span>
-                                <span id="js-chars">0 chars</span>
-                            </div>
-                        </div>
-                        <textarea id="js-editor" class="code-editor" spellcheck="false">// Interactive JavaScript
-function showDemo() {
-    // Create notification
-    const notification = document.createElement('div');
-    notification.className = 'notification';
-    notification.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 10px;">
-            <i class="fas fa-check-circle" style="color: #4CAF50; font-size: 1.5rem;"></i>
-            <div>
-                <h4 style="margin: 0; color: white;">🎉 Awesome!</h4>
-                <p style="margin: 5px 0 0 0; color: #a0a0ff;">
-                    Your JavaScript is working perfectly!
-                </p>
-            </div>
-        </div>
-    `;
+                    <div class="file-selector">
+                        <select id="js-file-selector" class="file-select">
+                            <option value="script.js">script.js</option>
+                        </select>
+                        <button class="btn btn-small" onclick="frontendEditor.addFile('js')">+</button>
+                    </div>
+                    <textarea id="js-editor" placeholder="Write your JavaScript here...">function showAlert() {
+    alert('Hello from JavaScript! 🎉');
     
-    // Style notification
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        border-radius: 10px;
-        padding: 20px;
-        max-width: 350px;
-        z-index: 1000;
-        animation: slideIn 0.3s ease;
-    `;
+    // Create a new element
+    const newElement = document.createElement('div');
+    newElement.innerHTML = '&lt;h3&gt;Dynamic Content!&lt;/h3&gt;&lt;p&gt;This was added by JavaScript.&lt;/p&gt;';
+    newElement.style.background = 'rgba(255,255,255,0.1)';
+    newElement.style.padding = '20px';
+    newElement.style.borderRadius = '10px';
+    newElement.style.marginTop = '20px';
     
-    document.body.appendChild(notification);
-    
-    // Remove notification after 3 seconds
-    setTimeout(() => {
-        notification.style.animation = 'slideOut 0.3s ease';
-        setTimeout(() => notification.remove(), 300);
-    }, 3000);
-    
-    // Add some visual effects
-    const btn = event.target;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-    btn.disabled = true;
-    
-    setTimeout(() => {
-        btn.innerHTML = '<i class="fas fa-check"></i> Done!';
-        setTimeout(() => {
-            btn.innerHTML = '<i class="fas fa-play"></i> Click Me';
-            btn.disabled = false;
-        }, 1000);
-    }, 500);
-    
-    // Add particles effect
-    createParticles(event.clientX, event.clientY);
+    document.body.appendChild(newElement);
 }
 
-function createParticles(x, y) {
-    for (let i = 0; i < 15; i++) {
-        const particle = document.createElement('div');
-        particle.style.cssText = `
-            position: fixed;
-            width: 8px;
-            height: 8px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            border-radius: 50%;
-            pointer-events: none;
-            z-index: 999;
-            left: ${x}px;
-            top: ${y}px;
-        `;
-        
-        document.body.appendChild(particle);
-        
-        // Animate particle
-        const angle = Math.random() * Math.PI * 2;
-        const speed = 2 + Math.random() * 3;
-        const duration = 500 + Math.random() * 500;
-        
-        particle.animate([
-            {
-                transform: 'translate(0, 0) scale(1)',
-                opacity: 1
-            },
-            {
-                transform: `translate(${Math.cos(angle) * speed * 50}px, ${Math.sin(angle) * speed * 50}px) scale(0)`,
-                opacity: 0
-            }
-        ], {
-            duration: duration,
-            easing: 'cubic-bezier(0.4, 0, 0.2, 1)'
-        }).onfinish = () => particle.remove();
-    }
-}
-
-// Add CSS animations
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes slideIn {
-        from {
-            transform: translateX(100%);
-            opacity: 0;
-        }
-        to {
-            transform: translateX(0);
-            opacity: 1;
-        }
-    }
-    
-    @keyframes slideOut {
-        from {
-            transform: translateX(0);
-            opacity: 1;
-        }
-        to {
-            transform: translateX(100%);
-            opacity: 0;
-        }
-    }
-`;
-document.head.appendChild(style);
-
-// Initialize when page loads
+// Add some interactive features
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 CodeCanvas Frontend Playground loaded!');
-    
-    // Add some console styling
-    console.log('%c✨ Welcome to CodeCanvas!', 
-        'color: #667eea; font-size: 18px; font-weight: bold;');
-    console.log('%cEdit any code and see instant results in the preview!',
-        'color: #a0a0ff; font-size: 14px;');
+    console.log('Frontend playground loaded!');
 });</textarea>
-                    </div>
                 </div>
-                
-                <!-- Preview Tab -->
+
                 <div class="tab-content" id="preview-tab">
-                    <div class="preview-container">
-                        <div class="preview-header">
-                            <div class="preview-info">
-                                <i class="fas fa-globe"></i>
-                                <span>Live Preview</span>
-                                <span class="preview-url">/preview</span>
-                            </div>
-                            <div class="preview-actions">
-                                <button class="preview-action-btn" onclick="frontendEditor.refreshPreview()">
-                                    <i class="fas fa-sync-alt"></i>
-                                    Refresh
-                                </button>
-                                <button class="preview-action-btn" onclick="frontendEditor.openInNewTab()">
-                                    <i class="fas fa-external-link-alt"></i>
-                                    New Tab
-                                </button>
-                            </div>
-                        </div>
-                        <iframe id="preview-frame" class="preview-frame"></iframe>
+                    <div class="preview-controls">
+                        <button id="refresh-preview" class="btn btn-small">🔄 Refresh</button>
+                        <button id="fullscreen-preview" class="btn btn-small">📺 Fullscreen</button>
+                        <span class="preview-size">
+                            <select id="preview-size-select">
+                                <option value="desktop">Desktop</option>
+                                <option value="tablet">Tablet</option>
+                                <option value="mobile">Mobile</option>
+                                <option value="responsive">Responsive</option>
+                            </select>
+                        </span>
                     </div>
+                    <iframe id="preview-frame"></iframe>
                 </div>
             </div>
         </div>
@@ -558,112 +160,119 @@ document.addEventListener('DOMContentLoaded', function() {
 
     <!-- Projects Modal -->
     <div id="projects-modal" class="modal">
-        <div class="modal-content night-modal">
+        <div class="modal-content">
             <div class="modal-header">
-                <h2><i class="fas fa-folder"></i> My Projects</h2>
+                <h2>My Projects</h2>
                 <button class="modal-close">&times;</button>
             </div>
             <div class="modal-body">
-                <div id="projects-list" class="projects-grid">
-                    <!-- Projects will be loaded here -->
-                </div>
+                <div id="projects-list"></div>
             </div>
         </div>
     </div>
 
-    <!-- Assets Modal -->
+    <!-- Assets Manager Modal -->
     <div id="assets-modal" class="modal">
-        <div class="modal-content night-modal">
+        <div class="modal-content">
             <div class="modal-header">
-                <h2><i class="fas fa-images"></i> Project Assets</h2>
+                <h2>Project Assets</h2>
                 <button class="modal-close">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="assets-upload-area">
                     <input type="file" id="asset-upload" multiple accept="image/*,.svg,.ico,.woff,.woff2,.ttf,.eot">
                     <label for="asset-upload" class="upload-label">
-                        <i class="fas fa-cloud-upload-alt"></i>
-                        <span>Drag & drop or click to upload assets</span>
-                        <small>Supports images, fonts, and icons</small>
+                        📁 Click to upload assets (images, fonts, etc.)
                     </label>
-                </div>
-                <div class="assets-list" id="assets-list">
-                    <!-- Assets will be listed here -->
+                    <div class="assets-list" id="assets-list">
+                        <!-- Assets will be listed here -->
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Notification Toast -->
-    <div id="notification-toast" class="toast">
-        <div class="toast-icon">
-            <i class="fas fa-check-circle"></i>
+    <!-- File Creation Modal -->
+    <div id="file-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Create New File</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="new-file-name">File Name:</label>
+                    <input type="text" id="new-file-name" placeholder="e.g., about.html, styles.css, app.js">
+                </div>
+                <div class="form-group">
+                    <label for="new-file-type">File Type:</label>
+                    <select id="new-file-type">
+                        <option value="html">HTML</option>
+                        <option value="css">CSS</option>
+                        <option value="js">JavaScript</option>
+                    </select>
+                </div>
+                <button id="create-file" class="btn btn-primary">Create File</button>
+            </div>
         </div>
-        <div class="toast-content">
-            <div class="toast-title" id="toast-title">Success</div>
-            <div class="toast-message" id="toast-message">Operation completed successfully</div>
-        </div>
-        <button class="toast-close" onclick="this.parentElement.style.display='none'">
-            <i class="fas fa-times"></i>
-        </button>
     </div>
 
-    <!-- Loading Overlay -->
-    <div id="loading-overlay" class="loading-overlay">
-        <div class="loading-spinner">
-            <div class="spinner-ring"></div>
-            <div class="spinner-text">Processing...</div>
-        </div>
+    <!-- Success Notification -->
+    <div id="success-notification" class="notification">
+        <span>✓</span> Project saved successfully! Share URL copied to clipboard.
     </div>
 
-    <!-- Token Handler Script -->
+    <!-- Token Handler Script (keep your existing one) -->
     <script>
-        // Your existing token handler script remains the same
         console.log('=== DEBUG: Token handler script loaded ===');
 
+        // Function to show editor selection popup
         function showEditorSelectionPopup() {
             console.log('DEBUG: showEditorSelectionPopup called');
+
+            // Create a beautiful popup
             const popupOverlay = document.createElement('div');
             popupOverlay.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0, 0, 0, 0.8);
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                z-index: 10000;
-                backdrop-filter: blur(10px);
-            `;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+        backdrop-filter: blur(10px);
+    `;
 
             const popupContent = document.createElement('div');
             popupContent.style.cssText = `
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                padding: 40px;
-                border-radius: 20px;
-                text-align: center;
-                color: white;
-                max-width: 500px;
-                width: 90%;
-                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-                border: 1px solid rgba(255, 255, 255, 0.2);
-            `;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 40px;
+        border-radius: 20px;
+        text-align: center;
+        color: white;
+        max-width: 500px;
+        width: 90%;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    `;
 
             popupContent.innerHTML = `
-                <h2 style="margin-bottom: 10px; font-size: 2rem;">🎉 Welcome!</h2>
-                <p style="margin-bottom: 30px; opacity: 0.9;">Would you like to switch to Code Editor?</p>
-                
-                <div style="display: flex; gap: 15px; justify-content: center;">
-                    <button id="stay-here" style="background: rgba(255, 255, 255, 0.2); color: white; border: 1px solid rgba(255, 255, 255, 0.3); padding: 12px 30px; border-radius: 25px; cursor: pointer; font-size: 1rem;">Stay Here</button>
-                    <button id="go-to-editor" style="background: rgba(255, 255, 255, 0.9); color: #667eea; border: none; padding: 12px 30px; border-radius: 25px; cursor: pointer; font-size: 1rem; font-weight: bold;">Go to Code Editor</button>
-                </div>
-            `;
+        <h2 style="margin-bottom: 10px; font-size: 2rem;">🎉 Welcome!</h2>
+        <p style="margin-bottom: 30px; opacity: 0.9;">Would you like to switch to Code Editor?</p>
+        
+        <div style="display: flex; gap: 15px; justify-content: center;">
+            <button id="stay-here" style="background: rgba(255, 255, 255, 0.2); color: white; border: 1px solid rgba(255, 255, 255, 0.3); padding: 12px 30px; border-radius: 25px; cursor: pointer; font-size: 1rem;">Stay Here</button>
+            <button id="go-to-editor" style="background: rgba(255, 255, 255, 0.9); color: #667eea; border: none; padding: 12px 30px; border-radius: 25px; cursor: pointer; font-size: 1rem; font-weight: bold;">Go to Code Editor</button>
+        </div>
+    `;
 
             popupOverlay.appendChild(popupContent);
             document.body.appendChild(popupOverlay);
 
+            // Add event listeners
             document.getElementById('stay-here').addEventListener('click', function () {
                 console.log('DEBUG: User chose to stay on Frontend Playground');
                 document.body.removeChild(popupOverlay);
@@ -674,6 +283,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.location.href = '/editor';
             });
 
+            // Close on overlay click
             popupOverlay.addEventListener('click', function (e) {
                 if (e.target === popupOverlay) {
                     console.log('DEBUG: Popup closed by overlay click');
@@ -682,8 +292,10 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
 
+        // Handle token from Google OAuth
         document.addEventListener('DOMContentLoaded', function () {
             console.log('DEBUG: DOMContentLoaded fired');
+
             const urlParams = new URLSearchParams(window.location.search);
             const token = urlParams.get('token');
             const freshLogin = sessionStorage.getItem('fresh_login');
@@ -696,8 +308,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (token) {
                 console.log('DEBUG: Token found in URL:', token.substring(0, 20) + '...');
+
                 if (!freshLogin) {
                     console.log('DEBUG: First time login, processing token...');
+
+                    // Store token in cookies
                     Cookies.set('token', token, {
                         expires: 7,
                         path: '/',
@@ -705,18 +320,47 @@ document.addEventListener('DOMContentLoaded', function() {
                         sameSite: 'strict'
                     });
                     console.log('DEBUG: Token stored in cookies');
+
+                    // Mark as processed
                     sessionStorage.setItem('fresh_login', 'true');
                     console.log('DEBUG: fresh_login set in sessionStorage');
+
+                    // Clean URL
                     const cleanURL = window.location.pathname;
                     window.history.replaceState({}, document.title, cleanURL);
                     console.log('DEBUG: URL cleaned to:', cleanURL);
+
+                    // Show popup after a short delay to ensure page is ready
                     setTimeout(() => {
                         console.log('DEBUG: Showing selection popup');
                         showEditorSelectionPopup();
                     }, 500);
+
+                } else {
+                    console.log('DEBUG: Already processed this login, skipping popup');
                 }
+            } else {
+                console.log('DEBUG: No token found in URL');
             }
         });
+
+        // Also check on page load (in case DOMContentLoaded already fired)
+        console.log('DEBUG: Script execution completed');
+        if (document.readyState === 'loading') {
+            console.log('DEBUG: Document still loading, waiting for DOMContentLoaded');
+        } else {
+            console.log('DEBUG: Document already ready, checking for token immediately');
+            const urlParams = new URLSearchParams(window.location.search);
+            const token = urlParams.get('token');
+            if (token && !sessionStorage.getItem('fresh_login')) {
+                console.log('DEBUG: Immediate token check - token found');
+                // Process immediately
+                Cookies.set('token', token, { expires: 7, path: '/' });
+                sessionStorage.setItem('fresh_login', 'true');
+                window.history.replaceState({}, document.title, window.location.pathname);
+                setTimeout(() => showEditorSelectionPopup(), 500);
+            }
+        }
     </script>
 
     <script src="/js/frontend_editor.js"></script>
