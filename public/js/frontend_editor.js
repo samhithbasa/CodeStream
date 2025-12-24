@@ -184,118 +184,9 @@ class SimpleFrontendEditor {
         if (tabName === 'preview') this.updatePreview();
     }
 
-    // ========== STEP 3: Helper method to extract and fix inline handlers ==========
-    extractAndFixInlineHandlers(html) {
-        // Find all elements with onclick, onchange, etc. handlers
-        const handlers = ['onclick', 'onchange', 'oninput', 'onsubmit', 'onkeypress', 'onkeydown', 'onkeyup'];
-        
-        let fixedHTML = html;
-        
-        handlers.forEach(handler => {
-            const regex = new RegExp(`${handler}="([^"]+)"`, 'gi');
-            fixedHTML = fixedHTML.replace(regex, (match, code) => {
-                // Wrap the handler code to ensure it executes in global scope
-                return `${handler}="(function(){ try { ${code} } catch(e){ console.error(e); } })()"`;
-            });
-        });
-        
-        return fixedHTML;
-    }
-
-    // ========== STEP 5: Event delegation for better reliability ==========
-    generateEventDelegationCode() {
-        return `
-        // Event delegation for buttons
-        document.addEventListener('click', function(e) {
-            const button = e.target.closest('button');
-            if (!button) return;
-            
-            const onclick = button.getAttribute('onclick');
-            if (onclick) {
-                try {
-                    eval(onclick);
-                } catch(error) {
-                    console.error('Button click error:', error);
-                }
-            }
-        });
-        
-        // Also handle other events
-        document.addEventListener('input', function(e) {
-            const oninput = e.target.getAttribute('oninput');
-            if (oninput) {
-                try {
-                    eval(oninput);
-                } catch(error) {
-                    console.error('Input event error:', error);
-                }
-            }
-        });
-        
-        document.addEventListener('change', function(e) {
-            const onchange = e.target.getAttribute('onchange');
-            if (onchange) {
-                try {
-                    eval(onchange);
-                } catch(error) {
-                    console.error('Change event error:', error);
-                }
-            }
-        });
-        
-        // Handle key events
-        document.addEventListener('keypress', function(e) {
-            const onkeypress = e.target.getAttribute('onkeypress');
-            if (onkeypress) {
-                try {
-                    eval(onkeypress);
-                } catch(error) {
-                    console.error('Keypress event error:', error);
-                }
-            }
-        });
-        `;
-    }
-
-    processJavaScriptForDeployment(js) {
-        // Extract all function declarations and make them global
-        let processed = js;
-        
-        // Match function declarations like: function myFunc() { ... }
-        const functionRegex = /function\s+(\w+)\s*\([^)]*\)\s*\{/g;
-        let match;
-        let functions = [];
-        
-        while ((match = functionRegex.exec(js)) !== null) {
-            functions.push(match[1]);
-        }
-        
-        // Also find arrow functions and const/let functions
-        const arrowFunctionRegex = /(const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>/g;
-        while ((match = arrowFunctionRegex.exec(js)) !== null) {
-            functions.push(match[2]);
-        }
-        
-        // Add window. prefix to make functions global
-        functions.forEach(func => {
-            // Replace function declarations
-            const funcDeclarationRegex = new RegExp(`function\\s+${func}\\s*\\([^)]*\\)\\s*\\{`, 'g');
-            processed = processed.replace(funcDeclarationRegex, `window.${func} = function(`);
-            
-            // Replace arrow functions
-            const arrowFuncRegex = new RegExp(`(const|let|var)\\s+${func}\\s*=\\s*(?:async\\s*)?\\([^)]*\\)\\s*=>`, 'g');
-            processed = processed.replace(arrowFuncRegex, `window.${func} = `);
-        });
-        
-        return processed;
-    }
-
+    // SIMPLE HTML GENERATION - NO COMPLEX PROCESSING
     generateHTML() {
         const projectName = document.getElementById('project-name')?.value || 'My Project';
-        
-        // Process JavaScript to make functions global for preview
-        const processedJS = this.processJavaScriptForDeployment(this.js);
-        const eventDelegationCode = this.generateEventDelegationCode();
         
         return `<!DOCTYPE html>
 <html>
@@ -310,24 +201,14 @@ class SimpleFrontendEditor {
 <body>
     ${this.html}
     <script>
-        // Event delegation for reliable button handling
-        ${eventDelegationCode}
-        
-        // User's JavaScript (made global)
+        // SIMPLE JAVASCRIPT - JUST EXECUTE AS-IS
         try {
-            ${processedJS}
+            ${this.js}
         } catch (error) {
             console.error('JavaScript error:', error);
         }
         
-        // Handle DOM ready
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', function() {
-                console.log('Preview loaded successfully');
-            });
-        } else {
-            console.log('Preview loaded successfully');
-        }
+        console.log('Preview loaded');
     </script>
 </body>
 </html>`;
@@ -349,17 +230,12 @@ class SimpleFrontendEditor {
         }
     }
 
-    generateSimpleDeploymentHTML(html, css, js) {
+    // SIMPLE DEPLOYMENT HTML GENERATION
+    generateDeploymentHTML(html, css, js) {
         const projectName = document.getElementById('project-name')?.value || 'My Project';
         
-        // Fix inline handlers in HTML
-        const fixedHTML = this.extractAndFixInlineHandlers(html);
-        
-        // Process JavaScript
-        const processedJS = this.processJavaScriptForDeployment(js);
-        
-        // Get event delegation code
-        const eventDelegationCode = this.generateEventDelegationCode();
+        // Make JavaScript functions global by adding them to window
+        const processedJS = this.makeFunctionsGlobal(js);
         
         return `<!DOCTYPE html>
 <html>
@@ -372,22 +248,55 @@ class SimpleFrontendEditor {
     </style>
 </head>
 <body>
-    ${fixedHTML}
+    ${html}
     <script>
-        // Event delegation for reliable button handling
-        ${eventDelegationCode}
+        // MAKE ALL FUNCTIONS GLOBAL
+        ${processedJS}
         
-        // User's JavaScript (made global)
-        try {
-            ${processedJS}
-        } catch (error) {
-            console.error('JavaScript error:', error);
-        }
-        
-        console.log('Project "${projectName}" loaded');
+        // Handle any inline onclick handlers
+        document.addEventListener('DOMContentLoaded', function() {
+            // Find all elements with onclick handlers
+            document.querySelectorAll('[onclick]').forEach(element => {
+                const originalOnClick = element.getAttribute('onclick');
+                element.onclick = function() {
+                    try {
+                        eval(originalOnClick);
+                    } catch(error) {
+                        console.error('onclick error:', error);
+                    }
+                };
+            });
+            
+            console.log('Project "${projectName}" loaded successfully');
+        });
     </script>
 </body>
 </html>`;
+    }
+
+    // SIMPLE FUNCTION TO MAKE JAVASCRIPT GLOBAL
+    makeFunctionsGlobal(js) {
+        // This is a very simple approach - just wrap the JS in a way that makes functions global
+        return `
+        // User's JavaScript code
+        (function() {
+            try {
+                ${js}
+            } catch(error) {
+                console.error('Error in user code:', error);
+            }
+        })();
+        
+        // Make sure functions are available globally
+        if (typeof append !== 'undefined') window.append = append;
+        if (typeof clearDisplay !== 'undefined') window.clearDisplay = clearDisplay;
+        if (typeof deleteLast !== 'undefined') window.deleteLast = deleteLast;
+        if (typeof calculate !== 'undefined') window.calculate = calculate;
+        if (typeof addTask !== 'undefined') window.addTask = addTask;
+        if (typeof deleteTask !== 'undefined') window.deleteTask = deleteTask;
+        if (typeof saveTasks !== 'undefined') window.saveTasks = saveTasks;
+        if (typeof render !== 'undefined') window.render = render;
+        `;
     }
 
     toggleFullscreenPreview() {
@@ -409,7 +318,6 @@ class SimpleFrontendEditor {
         }
     }
 
-    // ========== UPDATED saveProject method ==========
     async saveProject() {
         const token = Cookies.get('token');
         if (!token) {
@@ -430,15 +338,12 @@ class SimpleFrontendEditor {
         const projectName = document.getElementById('project-name')?.value.trim() || 'Untitled Project';
 
         try {
-            // Use original HTML, CSS, JS
             const htmlContent = this.html;
             const cssContent = this.css;
             const jsContent = this.js;
 
-            // Generate deployment HTML with all fixes
-            const deploymentHTML = this.generateSimpleDeploymentHTML(htmlContent, cssContent, jsContent);
-
-            console.log('Saving project with fixed deployment HTML');
+            // Generate deployment HTML
+            const deploymentHTML = this.generateDeploymentHTML(htmlContent, cssContent, jsContent);
 
             const response = await fetch('/api/frontend/save', {
                 method: 'POST',
