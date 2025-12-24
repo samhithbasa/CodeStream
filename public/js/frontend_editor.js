@@ -184,7 +184,6 @@ class SimpleFrontendEditor {
         if (tabName === 'preview') this.updatePreview();
     }
 
-    // ========== UNIVERSAL HTML GENERATION ==========
     generateHTML() {
         const projectName = document.getElementById('project-name')?.value || 'My Project';
 
@@ -201,29 +200,26 @@ class SimpleFrontendEditor {
 <body>
     ${this.html}
     <script>
-        // UNIVERSAL PREVIEW - MAKES ANY CODE WORK
-        (function() {
-            try {
-                // Execute user code
-                ${this.js}
-            } catch(error) {
-                console.error('JavaScript error:', error);
-            }
-            
-            // Universal event handler for preview
-            document.addEventListener('click', function(e) {
-                if (e.target.hasAttribute('onclick')) {
-                    const onclick = e.target.getAttribute('onclick');
-                    try {
-                        eval(onclick);
-                    } catch(err) {
-                        console.error('onclick error:', err);
-                    }
-                }
-            });
-        })();
+        // Execute user code in preview
+        try {
+            ${this.js}
+        } catch(error) {
+            console.error('JavaScript error in preview:', error);
+        }
         
-        console.log('Preview loaded');
+        // Preview onclick handler
+        document.addEventListener('click', function(e) {
+            if (e.target.hasAttribute('onclick')) {
+                const handler = e.target.getAttribute('onclick');
+                try {
+                    eval(handler);
+                } catch(error) {
+                    console.error('Preview onclick error:', error);
+                }
+            }
+        });
+        
+        console.log('Preview loaded successfully');
     </script>
 </body>
 </html>`;
