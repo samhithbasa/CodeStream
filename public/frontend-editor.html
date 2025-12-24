@@ -20,7 +20,7 @@
                 💾 Save & Deploy
             </button>
             <button id="theme-toggle" class="btn btn-secondary">🌙 Toggle Theme</button>
-            
+
             <!-- Dynamic Login/Logout Toggle Button -->
             <button id="auth-toggle" class="btn btn-login">
                 🔐 Login
@@ -126,68 +126,224 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
 
     <script>
-        // Token handler (keep as is)
         console.log('=== DEBUG: Token handler script loaded ===');
 
+        // Function to show editor selection popup
         function showEditorSelectionPopup() {
             console.log('DEBUG: showEditorSelectionPopup called');
+
+            // Create a beautiful popup
             const popupOverlay = document.createElement('div');
             popupOverlay.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0, 0, 0, 0.8);
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                z-index: 10000;
-                backdrop-filter: blur(10px);
-            `;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            backdrop-filter: blur(10px);
+        `;
 
             const popupContent = document.createElement('div');
             popupContent.style.cssText = `
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                padding: 40px;
-                border-radius: 20px;
-                text-align: center;
-                color: white;
-                max-width: 500px;
-                width: 90%;
-                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-                border: 1px solid rgba(255, 255, 255, 0.2);
-            `;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            color: white;
+            max-width: 600px;
+            width: 90%;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        `;
 
             popupContent.innerHTML = `
-                <h2 style="margin-bottom: 10px; font-size: 2rem;">🎉 Welcome!</h2>
-                <p style="margin-bottom: 30px; opacity: 0.9;">Would you like to switch to Code Editor?</p>
-                
-                <div style="display: flex; gap: 15px; justify-content: center;">
-                    <button id="stay-here" style="background: rgba(255, 255, 255, 0.2); color: white; border: 1px solid rgba(255, 255, 255, 0.3); padding: 12px 30px; border-radius: 25px; cursor: pointer; font-size: 1rem;">Stay Here</button>
-                    <button id="go-to-editor" style="background: rgba(255, 255, 255, 0.9); color: #667eea; border: none; padding: 12px 30px; border-radius: 25px; cursor: pointer; font-size: 1rem; font-weight: bold;">Go to Code Editor</button>
+            <h2 style="margin-bottom: 10px; font-size: 2rem;">🎉 Welcome to Code Editor!</h2>
+            <p style="margin-bottom: 15px; opacity: 0.9;">Would you like to switch to Code Editor?</p>
+            
+            <!-- IMPORTANT NOTES -->
+            <div style="background: rgba(255, 255, 255, 0.15); padding: 15px; border-radius: 10px; margin: 20px 0; text-align: left; border-left: 4px solid #ffd700;">
+                <h4 style="margin: 0 0 10px 0; color: #ffd700;">📝 Important Notes:</h4>
+                <div style="font-size: 0.9rem; line-height: 1.5;">
+                    <div style="margin-bottom: 10px;">
+                        <strong>🔧 For Frontend Playground:</strong>
+                        <ul style="margin: 5px 0 5px 20px; padding: 0;">
+                            <li>Write JavaScript functions globally using <code style="background: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 3px;">window.functionName = function()</code></li>
+                            <li>Example: <code style="background: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 3px;">window.calculate = function() { ... }</code></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong>☕ For Code Editor (Java):</strong>
+                        <ul style="margin: 5px 0 0 20px; padding: 0;">
+                            <li>Java code must use <code style="background: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 3px;">Main</code> class</li>
+                            <li>Example: <code style="background: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 3px;">public class Main { public static void main(String[] args) { ... } }</code></li>
+                        </ul>
+                    </div>
                 </div>
-            `;
+            </div>
+            
+            <div style="display: flex; gap: 15px; justify-content: center; margin-top: 20px;">
+                <button id="stay-here" style="
+                    background: rgba(255, 255, 255, 0.2); 
+                    color: white; 
+                    border: 1px solid rgba(255, 255, 255, 0.3); 
+                    padding: 12px 30px; 
+                    border-radius: 25px; 
+                    cursor: pointer; 
+                    font-size: 1rem;
+                    transition: all 0.3s ease;
+                    min-width: 150px;
+                ">Stay Here</button>
+                <button id="go-to-editor" style="
+                    background: rgba(255, 255, 255, 0.9); 
+                    color: #667eea; 
+                    border: none; 
+                    padding: 12px 30px; 
+                    border-radius: 25px; 
+                    cursor: pointer; 
+                    font-size: 1rem; 
+                    font-weight: bold;
+                    transition: all 0.3s ease;
+                    min-width: 150px;
+                ">Go to Code Editor</button>
+            </div>
+            
+            <p style="margin-top: 20px; font-size: 0.8rem; opacity: 0.7;">
+                <strong>Tip:</strong> You can switch between editors anytime using the navigation menu.
+            </p>
+        `;
 
             popupOverlay.appendChild(popupContent);
             document.body.appendChild(popupOverlay);
 
-            document.getElementById('stay-here').addEventListener('click', function () {
+            // Add hover effects
+            const stayBtn = document.getElementById('stay-here');
+            const goBtn = document.getElementById('go-to-editor');
+
+            stayBtn.addEventListener('mouseenter', () => {
+                stayBtn.style.background = 'rgba(255, 255, 255, 0.3)';
+                stayBtn.style.transform = 'translateY(-2px)';
+            });
+
+            stayBtn.addEventListener('mouseleave', () => {
+                stayBtn.style.background = 'rgba(255, 255, 255, 0.2)';
+                stayBtn.style.transform = 'translateY(0)';
+            });
+
+            goBtn.addEventListener('mouseenter', () => {
+                goBtn.style.background = 'rgba(255, 255, 255, 1)';
+                goBtn.style.transform = 'translateY(-2px)';
+                goBtn.style.boxShadow = '0 5px 15px rgba(0, 0, 0, 0.2)';
+            });
+
+            goBtn.addEventListener('mouseleave', () => {
+                goBtn.style.background = 'rgba(255, 255, 255, 0.9)';
+                goBtn.style.transform = 'translateY(0)';
+                goBtn.style.boxShadow = 'none';
+            });
+
+            // Add event listeners
+            stayBtn.addEventListener('click', function () {
                 console.log('DEBUG: User chose to stay on Frontend Playground');
                 document.body.removeChild(popupOverlay);
+
+                // Show a confirmation message
+                const confirmation = document.createElement('div');
+                confirmation.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #10b981;
+                color: white;
+                padding: 15px 25px;
+                border-radius: 10px;
+                box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+                animation: slideInRight 0.3s ease;
+                z-index: 10001;
+            `;
+                confirmation.textContent = '✓ Staying on Frontend Playground';
+                document.body.appendChild(confirmation);
+
+                setTimeout(() => {
+                    confirmation.style.animation = 'slideOutRight 0.3s ease';
+                    setTimeout(() => confirmation.remove(), 300);
+                }, 2000);
             });
 
-            document.getElementById('go-to-editor').addEventListener('click', function () {
+            goBtn.addEventListener('click', function () {
                 console.log('DEBUG: User chose to go to Code Editor');
-                window.location.href = '/editor';
+
+                // Add loading effect
+                goBtn.innerHTML = '⏳ Redirecting...';
+                goBtn.disabled = true;
+                goBtn.style.opacity = '0.7';
+
+                setTimeout(() => {
+                    window.location.href = '/editor';
+                }, 500);
             });
 
+            // Close on overlay click
             popupOverlay.addEventListener('click', function (e) {
                 if (e.target === popupOverlay) {
                     console.log('DEBUG: Popup closed by overlay click');
                     document.body.removeChild(popupOverlay);
                 }
             });
+
+            // Add CSS animation for the popup
+            const style = document.createElement('style');
+            style.textContent = `
+            @keyframes slideInRight {
+                from {
+                    transform: translateX(100%);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+            }
+            
+            @keyframes slideOutRight {
+                from {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+                to {
+                    transform: translateX(100%);
+                    opacity: 0;
+                }
+            }
+            
+            @keyframes fadeIn {
+                from {
+                    opacity: 0;
+                    transform: scale(0.9);
+                }
+                to {
+                    opacity: 1;
+                    transform: scale(1);
+                }
+            }
+            
+            #stay-here:hover, #go-to-editor:hover {
+                transform: translateY(-2px) !important;
+            }
+            
+            .popup-notes {
+                animation: fadeIn 0.5s ease;
+            }
+        `;
+            document.head.appendChild(style);
+
+            // Add animation class to notes section
+            const notesSection = popupContent.querySelector('div');
+            notesSection.classList.add('popup-notes');
         }
 
         // Handle token from Google OAuth
@@ -210,6 +366,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!freshLogin) {
                     console.log('DEBUG: First time login, processing token...');
 
+                    // Store token in cookies
                     Cookies.set('token', token, {
                         expires: 7,
                         path: '/',
@@ -218,17 +375,20 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                     console.log('DEBUG: Token stored in cookies');
 
+                    // Mark as processed
                     sessionStorage.setItem('fresh_login', 'true');
                     console.log('DEBUG: fresh_login set in sessionStorage');
 
+                    // Clean URL
                     const cleanURL = window.location.pathname;
                     window.history.replaceState({}, document.title, cleanURL);
                     console.log('DEBUG: URL cleaned to:', cleanURL);
 
+                    // Show popup after a short delay to ensure page is ready
                     setTimeout(() => {
                         console.log('DEBUG: Showing selection popup');
                         showEditorSelectionPopup();
-                    }, 500);
+                    }, 1000);
 
                 } else {
                     console.log('DEBUG: Already processed this login, skipping popup');
@@ -238,6 +398,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
+        // Also check on page load (in case DOMContentLoaded already fired)
+        console.log('DEBUG: Script execution completed');
         if (document.readyState === 'loading') {
             console.log('DEBUG: Document still loading, waiting for DOMContentLoaded');
         } else {
@@ -246,10 +408,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const token = urlParams.get('token');
             if (token && !sessionStorage.getItem('fresh_login')) {
                 console.log('DEBUG: Immediate token check - token found');
+                // Process immediately
                 Cookies.set('token', token, { expires: 7, path: '/' });
                 sessionStorage.setItem('fresh_login', 'true');
                 window.history.replaceState({}, document.title, window.location.pathname);
-                setTimeout(() => showEditorSelectionPopup(), 500);
+                setTimeout(() => showEditorSelectionPopup(), 1000);
             }
         }
     </script>
