@@ -184,9 +184,11 @@ class SimpleFrontendEditor {
         if (tabName === 'preview') this.updatePreview();
     }
 
-    // ========== UNIVERSAL HTML GENERATION ==========
     generateHTML() {
         const projectName = document.getElementById('project-name')?.value || 'My Project';
+
+        // Process JavaScript for preview too
+        const processedJS = this.processJavaScriptForDeployment(this.js);
 
         return `<!DOCTYPE html>
 <html>
@@ -201,27 +203,20 @@ class SimpleFrontendEditor {
 <body>
     ${this.html}
     <script>
-        // UNIVERSAL PREVIEW - MAKES ANY CODE WORK
-        (function() {
-            try {
-                // Execute user code
-                ${this.js}
-            } catch(error) {
-                console.error('JavaScript error:', error);
-            }
-            
-            // Universal event handler for preview
-            document.addEventListener('click', function(e) {
-                if (e.target.hasAttribute('onclick')) {
-                    const onclick = e.target.getAttribute('onclick');
-                    try {
-                        eval(onclick);
-                    } catch(err) {
-                        console.error('onclick error:', err);
-                    }
+        // Processed JavaScript for preview
+        ${processedJS}
+        
+        // Simple onclick handler for preview
+        document.addEventListener('click', function(e) {
+            if (e.target.hasAttribute('onclick')) {
+                const handler = e.target.getAttribute('onclick');
+                try {
+                    eval(handler);
+                } catch(error) {
+                    console.error('Preview onclick error:', error);
                 }
-            });
-        })();
+            }
+        });
         
         console.log('Preview loaded');
     </script>
@@ -246,10 +241,13 @@ class SimpleFrontendEditor {
     }
 
     // ========== UNIVERSAL DEPLOYMENT HTML GENERATION ==========
+    // ========== UNIVERSAL DEPLOYMENT HTML GENERATION ==========
     generateDeploymentHTML(html, css, js) {
         const projectName = document.getElementById('project-name')?.value || 'My Project';
 
-        // SIMPLIFIED VERSION - Just make everything work
+        // Process JavaScript to make ALL functions global
+        const processedJS = this.processJavaScriptForDeployment(js);
+
         return `<!DOCTYPE html>
 <html>
 <head>
@@ -263,90 +261,107 @@ class SimpleFrontendEditor {
 <body>
     ${html}
     <script>
-        // === UNIVERSAL JAVASCRIPT HANDLER ===
-        // This makes ANY frontend code work
+        // === CRITICAL: MAKE ALL FUNCTIONS GLOBAL ===
+        // This ensures onclick handlers can find functions
         
-        // 1. Execute the user's code
-        try {
-            // First, run the user's JavaScript
-            (function() {
-                ${js}
-            })();
-        } catch(error) {
-            console.error('User code error:', error);
-        }
+        // 1. Process user's JavaScript to attach everything to window
+        ${processedJS}
         
-        // 2. Universal event handler system
+        // 2. Universal click handler for onclick attributes
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM loaded - setting up universal handlers');
+            console.log('Setting up universal event handlers...');
             
-            // Find all elements with onclick and attach event listeners
-            const elementsWithOnClick = document.querySelectorAll('[onclick]');
-            elementsWithOnClick.forEach(element => {
-                const originalHandler = element.getAttribute('onclick');
-                if (originalHandler) {
-                    // Remove the onclick attribute to prevent conflicts
-                    element.removeAttribute('onclick');
-                    
-                    // Add event listener
-                    element.addEventListener('click', function(e) {
-                        try {
-                            // Execute the handler code
-                            eval(originalHandler);
-                        } catch(error) {
-                            console.error('onclick execution error:', error, 'Handler:', originalHandler);
-                        }
-                    });
-                }
-            });
-            
-            // Global click handler as backup
-            document.addEventListener('click', function(e) {
-                const onclick = e.target.getAttribute('onclick');
-                if (onclick) {
-                    e.preventDefault();
+            // Handle ALL onclick attributes
+            document.querySelectorAll('[onclick]').forEach(element => {
+                const originalOnClick = element.getAttribute('onclick');
+                
+                // Replace the onclick attribute with event listener
+                element.removeAttribute('onclick');
+                element.addEventListener('click', function(e) {
                     try {
-                        eval(onclick);
+                        // Use Function constructor for safe execution in global scope
+                        const func = new Function('return (' + originalOnClick + ')');
+                        func().call(element);
                     } catch(error) {
-                        console.error('Global onclick error:', error);
+                        console.error('Error executing onclick:', error);
+                        // Fallback to eval
+                        try {
+                            eval(originalOnClick);
+                        } catch(e) {
+                            console.error('Fallback also failed:', e);
+                        }
                     }
-                }
+                });
             });
             
-            // Make common functions globally available
-            const commonFunctions = [
-                'append', 'clearDisplay', 'deleteLast', 'calculate',
-                'addTask', 'deleteTask', 'save', 'render',
-                'saveTasks', 'showAlert', 'init', 'load'
-            ];
-            
-            commonFunctions.forEach(funcName => {
-                try {
-                    if (typeof eval(funcName) === 'function') {
-                        window[funcName] = eval(funcName);
-                    }
-                } catch(e) {
-                    // Ignore - function doesn't exist
-                }
-            });
-            
-            console.log('Universal handlers setup complete for project: "${projectName}"');
+            console.log('Universal handlers ready for project: "${projectName}"');
         });
         
-        // 3. Fallback: If DOMContentLoaded already fired, run setup immediately
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', function() {
-                console.log('DOMContentLoaded fired');
-            });
-        } else {
-            console.log('DOM already loaded, running setup');
-            // Run setup immediately
+        // 3. If DOM already loaded, trigger setup
+        if (document.readyState !== 'loading') {
             const event = new Event('DOMContentLoaded');
             document.dispatchEvent(event);
         }
     </script>
 </body>
 </html>`;
+    }
+
+    // ========== CRITICAL: PROCESS JAVASCRIPT TO MAKE FUNCTIONS GLOBAL ==========
+    processJavaScriptForDeployment(js) {
+        // This is the MOST IMPORTANT function
+        // It rewrites ALL function declarations to be attached to window
+
+        let processed = js;
+
+        // Pattern 1: Regular functions - function myFunc() { ... }
+        const funcRegex = /function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\([^)]*\)\s*\{/g;
+
+        // Replace all function declarations with window.attachment
+        processed = processed.replace(funcRegex, 'window.$1 = function(');
+
+        // Pattern 2: Const arrow functions - const myFunc = () => { ... }
+        const arrowRegex = /(const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>/g;
+
+        processed = processed.replace(arrowRegex, 'window.$2 = ');
+
+        // Pattern 3: Const function expressions - const myFunc = function() { ... }
+        const exprRegex = /(const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*function/g;
+
+        processed = processed.replace(exprRegex, 'window.$2 = function');
+
+        // Also ensure that functions called from within the code use window.
+        const functionCalls = this.extractFunctionCalls(js);
+        functionCalls.forEach(func => {
+            // Replace function calls with window.func if func is a known function
+            const callRegex = new RegExp(`\\b${func}\\(`, 'g');
+            if (!processed.includes(`window.${func} =`)) {
+                // If it's not defined in this file, it might be from onclick
+                // We'll handle it via the onclick processor
+            }
+        });
+
+        return processed;
+    }
+
+    extractFunctionCalls(js) {
+        const calls = new Set();
+
+        // Find function calls like myFunc() but not declarations
+        const callRegex = /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/g;
+        let match;
+
+        // List of JavaScript keywords to exclude
+        const keywords = ['if', 'for', 'while', 'switch', 'catch', 'function', 'return', 'typeof'];
+
+        while ((match = callRegex.exec(js)) !== null) {
+            const funcName = match[1];
+            if (!keywords.includes(funcName) && !funcName.match(/^[0-9]/)) {
+                calls.add(funcName);
+            }
+        }
+
+        return Array.from(calls);
     }
 
     // ========== HELPER METHODS ==========
