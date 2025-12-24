@@ -17,7 +17,7 @@ class SimpleFrontendEditor {
         this.checkAuthStatus();
         this.loadFromLocalStorage();
         this.updatePreview();
-        
+
         // Set initial theme
         this.applyNightTheme();
     }
@@ -62,7 +62,7 @@ class SimpleFrontendEditor {
         showProjectsBtn.className = 'btn btn-secondary';
         showProjectsBtn.innerHTML = '📁 My Projects';
         showProjectsBtn.addEventListener('click', () => this.showProjects());
-        
+
         const headerRight = document.querySelector('.header-right');
         if (headerRight) {
             const saveBtn = document.getElementById('save-project');
@@ -122,15 +122,15 @@ class SimpleFrontendEditor {
                 this.html = data.html || '';
                 this.css = data.css || '';
                 this.js = data.js || '';
-                
+
                 const htmlEditor = document.getElementById('html-editor');
                 const cssEditor = document.getElementById('css-editor');
                 const jsEditor = document.getElementById('js-editor');
-                
+
                 if (htmlEditor && this.html) htmlEditor.value = this.html;
                 if (cssEditor && this.css) cssEditor.value = this.css;
                 if (jsEditor && this.js) jsEditor.value = this.js;
-                
+
                 console.log('Loaded from localStorage');
             }
         } catch (error) {
@@ -157,7 +157,7 @@ class SimpleFrontendEditor {
         body.classList.toggle('night-mode');
         const isNightMode = body.classList.contains('night-mode');
         localStorage.setItem('editorTheme', isNightMode ? 'night' : 'light');
-        
+
         const themeBtn = document.getElementById('theme-toggle');
         if (themeBtn) {
             themeBtn.innerHTML = isNightMode ? '☀️ Light Mode' : '🌙 Night Mode';
@@ -187,7 +187,7 @@ class SimpleFrontendEditor {
     // ========== UNIVERSAL HTML GENERATION ==========
     generateHTML() {
         const projectName = document.getElementById('project-name')?.value || 'My Project';
-        
+
         return `<!DOCTYPE html>
 <html>
 <head>
@@ -248,11 +248,8 @@ class SimpleFrontendEditor {
     // ========== UNIVERSAL DEPLOYMENT HTML GENERATION ==========
     generateDeploymentHTML(html, css, js) {
         const projectName = document.getElementById('project-name')?.value || 'My Project';
-        
-        // Extract all function names from JavaScript
-        const functionNames = this.extractAllFunctionNames(js);
-        
-        // Generate the universal deployment HTML
+
+        // SIMPLIFIED VERSION - Just make everything work
         return `<!DOCTYPE html>
 <html>
 <head>
@@ -266,90 +263,87 @@ class SimpleFrontendEditor {
 <body>
     ${html}
     <script>
-        // ========== UNIVERSAL DEPLOYMENT SYSTEM ==========
-        // This makes ANY frontend code work in deployed links
+        // === UNIVERSAL JAVASCRIPT HANDLER ===
+        // This makes ANY frontend code work
         
-        // 1. Execute user's JavaScript code
-        (function() {
-            try {
+        // 1. Execute the user's code
+        try {
+            // First, run the user's JavaScript
+            (function() {
                 ${js}
-            } catch(error) {
-                console.error('User code execution error:', error);
-            }
-        })();
-        
-        // 2. Make ALL functions globally available
-        ${functionNames.map(fn => `
-            try {
-                if (typeof ${fn} === 'function') {
-                    window.${fn} = ${fn};
-                }
-            } catch(e) {
-                // Function might not exist or be in a different scope
-            }
-        `).join('')}
-        
-        // 3. Universal event handler system
-        function executeEventHandler(code) {
-            try {
-                // First try direct execution
-                return eval(code);
-            } catch(error1) {
-                try {
-                    // If that fails, try to execute in global context
-                    return Function('"use strict"; return (' + code + ')')();
-                } catch(error2) {
-                    console.error('Event handler execution failed:', error2);
-                    return null;
-                }
-            }
+            })();
+        } catch(error) {
+            console.error('User code error:', error);
         }
         
-        // 4. Handle ALL inline event handlers
+        // 2. Universal event handler system
         document.addEventListener('DOMContentLoaded', function() {
-            // Process all elements with event handlers
-            const elementsWithHandlers = document.querySelectorAll('[onclick]');
-            elementsWithHandlers.forEach(element => {
+            console.log('DOM loaded - setting up universal handlers');
+            
+            // Find all elements with onclick and attach event listeners
+            const elementsWithOnClick = document.querySelectorAll('[onclick]');
+            elementsWithOnClick.forEach(element => {
                 const originalHandler = element.getAttribute('onclick');
                 if (originalHandler) {
+                    // Remove the onclick attribute to prevent conflicts
+                    element.removeAttribute('onclick');
+                    
+                    // Add event listener
                     element.addEventListener('click', function(e) {
-                        e.preventDefault();
-                        executeEventHandler(originalHandler);
+                        try {
+                            // Execute the handler code
+                            eval(originalHandler);
+                        } catch(error) {
+                            console.error('onclick execution error:', error, 'Handler:', originalHandler);
+                        }
                     });
                 }
             });
             
-            // Also set up global click handler as backup
+            // Global click handler as backup
             document.addEventListener('click', function(e) {
-                if (e.target.hasAttribute('onclick')) {
-                    const handler = e.target.getAttribute('onclick');
+                const onclick = e.target.getAttribute('onclick');
+                if (onclick) {
                     e.preventDefault();
-                    executeEventHandler(handler);
+                    try {
+                        eval(onclick);
+                    } catch(error) {
+                        console.error('Global onclick error:', error);
+                    }
                 }
             });
             
-            console.log('Project "${projectName}" loaded successfully - Universal mode');
-        });
-        
-        // 5. Additional function detection (fallback)
-        setTimeout(function() {
+            // Make common functions globally available
             const commonFunctions = [
                 'append', 'clearDisplay', 'deleteLast', 'calculate',
                 'addTask', 'deleteTask', 'save', 'render',
-                'saveTasks', 'showAlert', 'init', 'load',
-                'handleClick', 'handleInput', 'testClick'
+                'saveTasks', 'showAlert', 'init', 'load'
             ];
             
             commonFunctions.forEach(funcName => {
                 try {
-                    if (eval('typeof ' + funcName) === 'function') {
+                    if (typeof eval(funcName) === 'function') {
                         window[funcName] = eval(funcName);
                     }
                 } catch(e) {
-                    // Ignore errors
+                    // Ignore - function doesn't exist
                 }
             });
-        }, 100);
+            
+            console.log('Universal handlers setup complete for project: "${projectName}"');
+        });
+        
+        // 3. Fallback: If DOMContentLoaded already fired, run setup immediately
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                console.log('DOMContentLoaded fired');
+            });
+        } else {
+            console.log('DOM already loaded, running setup');
+            // Run setup immediately
+            const event = new Event('DOMContentLoaded');
+            document.dispatchEvent(event);
+        }
     </script>
 </body>
 </html>`;
@@ -358,26 +352,26 @@ class SimpleFrontendEditor {
     // ========== HELPER METHODS ==========
     extractAllFunctionNames(js) {
         const functionNames = new Set();
-        
+
         // 1. Regular function declarations: function myFunc() {...}
         const funcRegex = /function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/g;
         let match;
         while ((match = funcRegex.exec(js)) !== null) {
             functionNames.add(match[1]);
         }
-        
+
         // 2. Arrow functions: const myFunc = () => {...}
         const arrowRegex = /(?:const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>/g;
         while ((match = arrowRegex.exec(js)) !== null) {
             functionNames.add(match[1]);
         }
-        
+
         // 3. Function expressions: const myFunc = function() {...}
         const exprRegex = /(?:const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*function/g;
         while ((match = exprRegex.exec(js)) !== null) {
             functionNames.add(match[1]);
         }
-        
+
         // 4. Method definitions: myMethod() {...}
         const methodRegex = /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\([^)]*\)\s*\{/g;
         while ((match = methodRegex.exec(js)) !== null) {
@@ -387,7 +381,7 @@ class SimpleFrontendEditor {
                 functionNames.add(match[1]);
             }
         }
-        
+
         return Array.from(functionNames);
     }
 
@@ -464,7 +458,7 @@ class SimpleFrontendEditor {
                 navigator.clipboard.writeText(shareUrl).then(() => {
                     this.showSuccessNotification(shareUrl);
                 });
-                
+
                 if (saveBtn) {
                     saveBtn.innerHTML = '✅ Saved!';
                     setTimeout(() => {
@@ -685,9 +679,9 @@ class SimpleFrontendEditor {
                 <button id="close-projects" style="background: none; border: none; color: #fff; font-size: 24px; cursor: pointer;">×</button>
             </div>
             <div id="projects-list" style="display: grid; gap: 15px;">
-                ${projects.length === 0 ? 
-                    '<p style="text-align: center; color: #888; padding: 40px;">No projects found. Create your first project!</p>' : 
-                    projects.map(project => `
+                ${projects.length === 0 ?
+                '<p style="text-align: center; color: #888; padding: 40px;">No projects found. Create your first project!</p>' :
+                projects.map(project => `
                         <div class="project-card" style="background: rgba(255,255,255,0.05); border-radius: 10px; padding: 20px; border: 1px solid rgba(255,255,255,0.1);">
                             <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                                 <div>
@@ -719,7 +713,7 @@ class SimpleFrontendEditor {
         // Close modal events
         const closeBtn = modalContent.querySelector('#close-projects');
         closeBtn.addEventListener('click', () => modal.remove());
-        
+
         modal.addEventListener('click', (e) => {
             if (e.target === modal) modal.remove();
         });
@@ -747,35 +741,35 @@ class SimpleFrontendEditor {
             }
 
             const project = await response.json();
-            
+
             // Load project data
             document.getElementById('project-name').value = project.name;
-            
+
             // Load files
             this.html = project.files?.html?.['index.html'] || '';
             this.css = project.files?.css?.['style.css'] || '';
             this.js = project.files?.js?.['script.js'] || '';
-            
+
             // Update editors
             const htmlEditor = document.getElementById('html-editor');
             const cssEditor = document.getElementById('css-editor');
             const jsEditor = document.getElementById('js-editor');
-            
+
             if (htmlEditor) htmlEditor.value = this.html;
             if (cssEditor) cssEditor.value = this.css;
             if (jsEditor) jsEditor.value = this.js;
-            
+
             // Update preview
             this.updatePreview();
-            
+
             // Save to localStorage
             this.saveToLocalStorage();
-            
+
             // Close projects modal
             document.querySelector('.projects-modal')?.remove();
-            
+
             this.showNotification('Project loaded successfully!');
-            
+
         } catch (error) {
             console.error('Error opening project:', error);
             alert('Error opening project: ' + error.message);
@@ -805,15 +799,15 @@ class SimpleFrontendEditor {
             if (projectCard) {
                 projectCard.remove();
             }
-            
+
             // If no projects left, show message
             const projectsList = document.getElementById('projects-list');
             if (projectsList && projectsList.children.length === 0) {
                 projectsList.innerHTML = '<p style="text-align: center; color: #888; padding: 40px;">No projects found. Create your first project!</p>';
             }
-            
+
             this.showNotification('Project deleted successfully!');
-            
+
         } catch (error) {
             console.error('Error deleting project:', error);
             alert('Error deleting project: ' + error.message);

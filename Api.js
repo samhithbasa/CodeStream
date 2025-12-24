@@ -962,7 +962,7 @@ app.delete('/delete-code/:id', authenticateToken, (req, res) => {
 
 app.post('/api/frontend/save', authenticateToken, async (req, res) => {
     try {
-        const { name, files, assets, structure } = req.body;
+        const { name, files, assets, structure, deploymentHTML } = req.body;
         const projectId = uuidv4();
 
         const projectData = {
@@ -974,7 +974,12 @@ app.post('/api/frontend/save', authenticateToken, async (req, res) => {
             userId: req.user.userId,
             userEmail: req.user.email,
             createdAt: new Date(),
-            updatedAt: new Date()
+            updatedAt: new Date(),
+            // Ensure deploymentHTML is saved
+            deploymentHTML: deploymentHTML || generateDeployedHTML({
+                name: name || 'Untitled Project',
+                files: files || {}
+            })
         };
 
         // Save to file system
@@ -984,7 +989,7 @@ app.post('/api/frontend/save', authenticateToken, async (req, res) => {
         res.json({
             success: true,
             projectId,
-            shareUrl: `https://memory-update-production.up.railway.app/frontend/${projectId}`,
+            shareUrl: `https://${req.headers.host}/frontend/${projectId}`,
             message: 'Project saved successfully'
         });
     } catch (error) {
@@ -1103,7 +1108,7 @@ function generateDeployedHTML(projectData) {
         return projectData.deploymentHTML;
     }
 
-    console.log('[DEBUG] Generating simple deployment HTML');
+    console.log('[DEBUG] Generating universal deployment HTML');
 
     const { files, name } = projectData;
     
@@ -1112,7 +1117,9 @@ function generateDeployedHTML(projectData) {
     const cssContent = files?.css?.['style.css'] || '';
     const jsContent = files?.js?.['script.js'] || '';
 
-    // SIMPLE HTML without any extra navigation
+    // Extract function names from JavaScript
+    const functionNames = extractFunctionNames(jsContent);
+    
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1126,20 +1133,62 @@ function generateDeployedHTML(projectData) {
 <body>
     ${htmlContent}
     <script>
-        // Simple script execution
+        // Execute user's JavaScript
         (function() {
             try {
                 ${jsContent}
-            } catch (error) {
+            } catch(error) {
                 console.error('JavaScript error:', error);
             }
-            
-            // Log project info
-            console.log('Project "${name || 'Untitled'}" loaded');
         })();
+        
+        // Make functions global
+        ${functionNames.map(fn => `
+            try {
+                if (typeof ${fn} === 'function') {
+                    window.${fn} = ${fn};
+                }
+            } catch(e) {}
+        `).join('\n')}
+        
+        // Universal event handler
+        document.addEventListener('DOMContentLoaded', function() {
+            // Handle onclick events
+            document.addEventListener('click', function(e) {
+                if (e.target.hasAttribute('onclick')) {
+                    const handler = e.target.getAttribute('onclick');
+                    try {
+                        eval(handler);
+                    } catch(error) {
+                        console.error('onclick error:', error);
+                    }
+                }
+            });
+            
+            console.log('Project "${name || 'Untitled'}" loaded');
+        });
     </script>
 </body>
 </html>`;
+}
+
+function extractFunctionNames(js) {
+    const functionNames = new Set();
+    
+    // Match function declarations
+    const funcRegex = /function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/g;
+    let match;
+    while ((match = funcRegex.exec(js)) !== null) {
+        functionNames.add(match[1]);
+    }
+    
+    // Match arrow functions
+    const arrowRegex = /(?:const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>/g;
+    while ((match = arrowRegex.exec(js)) !== null) {
+        functionNames.add(match[1]);
+    }
+    
+    return Array.from(functionNames);
 }
 
 // Add this route to Api.js to handle individual file requests within projects
@@ -1237,22 +1286,56 @@ app.get('/frontend/:projectId/:filename', (req, res) => {
 app.get('/frontend/:id', (req, res) => {
     try {
         const projectId = req.params.id;
+
+        // Handle .js, .css, .html file requests
+        if (projectId.endsWith('.js') || projectId.endsWith('.css') || projectId.endsWith('.html')) {
+            // Extract the actual project ID from the filename
+            const actualProjectId = projectId.split('.')[0]; // Remove extension
+            const filePath = path.join(FRONTEND_STORAGE_DIR, `${actualProjectId}.json`);
+            
+            if (!fs.existsSync(filePath)) {
+                return res.status(404).send('Project not found');
+            }
+
+            const projectData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+            
+            // Check which file type is requested
+            if (projectId.endsWith('.js')) {
+                res.setHeader('Content-Type', 'application/javascript');
+                return res.send(projectData.files?.js?.['script.js'] || '');
+            } else if (projectId.endsWith('.css')) {
+                res.setHeader('Content-Type', 'text/css');
+                return res.send(projectData.files?.css?.['style.css'] || '');
+            } else if (projectId.endsWith('.html')) {
+                res.setHeader('Content-Type', 'text/html');
+                return res.send(projectData.files?.html?.['index.html'] || '');
+            }
+        }
+
+        // Handle regular project ID
         const projectPath = path.join(FRONTEND_STORAGE_DIR, `${projectId}.json`);
 
         if (!fs.existsSync(projectPath)) {
-            return res.status(404).send('Project not found');
+            return res.status(404).send(`
+                <html>
+                    <body>
+                        <h1>Project Not Found</h1>
+                        <p>The requested project does not exist.</p>
+                    </body>
+                </html>
+            `);
         }
 
         const projectData = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
         
-        // Use the deploymentHTML if it exists
+        // Use deploymentHTML if it exists
         if (projectData.deploymentHTML) {
             res.setHeader('Content-Type', 'text/html');
             return res.send(projectData.deploymentHTML);
         }
         
         // Fallback to simple generation
-        const simpleHTML = generateSimpleDeployedHTML(projectData);
+        const simpleHTML = generateDeployedHTML(projectData);
         res.setHeader('Content-Type', 'text/html');
         res.send(simpleHTML);
 
