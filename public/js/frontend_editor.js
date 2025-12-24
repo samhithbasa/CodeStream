@@ -7,6 +7,7 @@ class SimpleFrontendEditor {
         this.js = '';
         this.isAuthenticated = false;
         this.baseUrl = window.location.origin;
+        this.currentProjectId = null;
         this.init();
     }
 
@@ -54,6 +55,19 @@ class SimpleFrontendEditor {
 
         const fullscreenBtn = document.getElementById('fullscreen-preview');
         if (fullscreenBtn) fullscreenBtn.addEventListener('click', () => this.toggleFullscreenPreview());
+
+        // Add My Projects button
+        const showProjectsBtn = document.createElement('button');
+        showProjectsBtn.id = 'show-projects';
+        showProjectsBtn.className = 'btn btn-secondary';
+        showProjectsBtn.innerHTML = '📁 My Projects';
+        showProjectsBtn.addEventListener('click', () => this.showProjects());
+        
+        const headerRight = document.querySelector('.header-right');
+        if (headerRight) {
+            const saveBtn = document.getElementById('save-project');
+            headerRight.insertBefore(showProjectsBtn, saveBtn.nextSibling);
+        }
     }
 
     setupEditorListeners() {
@@ -173,6 +187,12 @@ class SimpleFrontendEditor {
     generateHTML() {
         const projectName = document.getElementById('project-name')?.value || 'My Project';
         
+        // FIX: Properly escape JavaScript
+        const escapedJS = this.js
+            .replace(/<\/script>/gi, '<\\/script>')
+            .replace(/`/g, '\\`')
+            .replace(/\${/g, '\\${');
+
         return `<!DOCTYPE html>
 <html>
 <head>
@@ -186,7 +206,20 @@ class SimpleFrontendEditor {
 <body>
     ${this.html}
     <script>
-        ${this.js}
+        try {
+            ${escapedJS}
+        } catch (error) {
+            console.error('JavaScript error:', error);
+        }
+        
+        // Make sure DOM is loaded
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                console.log('Project loaded successfully');
+            });
+        } else {
+            console.log('Project loaded successfully');
+        }
     </script>
 </body>
 </html>`;
@@ -227,7 +260,7 @@ class SimpleFrontendEditor {
         }
     }
 
-    // Auth Methods (keep same as before)
+    // Auth Methods
     async checkAuthStatus() {
         const token = Cookies.get('token');
         const authToggle = document.getElementById('auth-toggle');
@@ -370,8 +403,8 @@ class SimpleFrontendEditor {
             const cssContent = this.css;
             const jsContent = this.js;
 
-            // Generate final HTML
-            const deploymentHTML = this.generateHTML();
+            // Generate final HTML with proper escaping
+            const deploymentHTML = this.generateDeploymentHTML();
 
             const response = await fetch('/api/frontend/save', {
                 method: 'POST',
@@ -394,6 +427,7 @@ class SimpleFrontendEditor {
             const result = await response.json();
 
             if (result.success) {
+                this.currentProjectId = result.projectId;
                 const shareUrl = result.shareUrl;
                 navigator.clipboard.writeText(shareUrl).then(() => {
                     this.showSuccessNotification(shareUrl);
@@ -426,12 +460,265 @@ class SimpleFrontendEditor {
         }
     }
 
+    generateDeploymentHTML() {
+        const projectName = document.getElementById('project-name')?.value || 'My Project';
+        
+        // Properly escape all content
+        const escapedCSS = this.css
+            .replace(/<\/style>/gi, '<\\/style>');
+        
+        const escapedJS = this.js
+            .replace(/<\/script>/gi, '<\\/script>')
+            .replace(/`/g, '\\`')
+            .replace(/\${/g, '\\${');
+
+        return `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${projectName}</title>
+    <style>
+        ${escapedCSS}
+    </style>
+</head>
+<body>
+    ${this.html}
+    <script>
+        (function() {
+            try {
+                ${escapedJS}
+            } catch (error) {
+                console.error('JavaScript execution error:', error);
+            }
+            
+            // Initialize when DOM is ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function() {
+                    console.log('Project "${projectName}" loaded successfully');
+                });
+            } else {
+                console.log('Project "${projectName}" loaded successfully');
+            }
+        })();
+    </script>
+</body>
+</html>`;
+    }
+
     showSuccessNotification(url) {
         const n = document.getElementById('success-notification');
         if (n) {
+            n.innerHTML = `<span>✓</span> Project saved! Share URL: <a href="${url}" target="_blank">${url}</a>`;
             n.style.display = 'flex';
-            setTimeout(() => (n.style.display = 'none'), 4000);
+            setTimeout(() => (n.style.display = 'none'), 5000);
         }
+    }
+
+    async showProjects() {
+        const token = Cookies.get('token');
+        if (!token) {
+            alert('Please login to view your projects');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/frontend/projects', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load projects');
+            }
+
+            const projects = await response.json();
+            this.displayProjectsModal(projects);
+        } catch (error) {
+            console.error('Error loading projects:', error);
+            alert('Error loading projects: ' + error.message);
+        }
+    }
+
+    displayProjectsModal(projects) {
+        // Create modal
+        const modal = document.createElement('div');
+        modal.className = 'projects-modal';
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        `;
+
+        const modalContent = document.createElement('div');
+        modalContent.style.cssText = `
+            background: var(--dark-bg, #1e1e1e);
+            color: var(--text-color, #e0e0e0);
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 800px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-color, #444);
+        `;
+
+        modalContent.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="margin: 0;">My Projects</h2>
+                <button id="close-projects" style="background: none; border: none; color: #fff; font-size: 24px; cursor: pointer;">×</button>
+            </div>
+            <div id="projects-list" style="display: grid; gap: 15px;">
+                ${projects.length === 0 ? 
+                    '<p style="text-align: center; color: #888; padding: 40px;">No projects found. Create your first project!</p>' : 
+                    projects.map(project => `
+                        <div class="project-card" style="background: rgba(255,255,255,0.05); border-radius: 10px; padding: 20px; border: 1px solid rgba(255,255,255,0.1);">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                                <div>
+                                    <h3 style="margin: 0 0 10px 0; color: #fff;">${this.escapeHtml(project.name)}</h3>
+                                    <p style="margin: 0; color: #aaa; font-size: 14px;">
+                                        Created: ${new Date(project.createdAt).toLocaleDateString()}
+                                    </p>
+                                </div>
+                                <div style="display: flex; gap: 10px;">
+                                    <button class="btn-open" style="background: #3b82f6; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px;" 
+                                            onclick="frontendEditor.openProject('${project.id}')">Open</button>
+                                    <button class="btn-delete" style="background: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px;"
+                                            onclick="frontendEditor.deleteProject('${project.id}', '${this.escapeHtml(project.name)}')">Delete</button>
+                                </div>
+                            </div>
+                            <div style="margin-top: 15px;">
+                                <p style="margin: 5px 0; font-size: 13px; color: #888;">
+                                    <strong>Share URL:</strong> <a href="${project.shareUrl}" target="_blank" style="color: #3b82f6; text-decoration: none;">${project.shareUrl}</a>
+                                </p>
+                            </div>
+                        </div>
+                    `).join('')}
+            </div>
+        `;
+
+        modal.appendChild(modalContent);
+        document.body.appendChild(modal);
+
+        // Close modal events
+        const closeBtn = modalContent.querySelector('#close-projects');
+        closeBtn.addEventListener('click', () => modal.remove());
+        
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.remove();
+        });
+
+        // Escape key to close
+        document.addEventListener('keydown', function closeModalOnEsc(e) {
+            if (e.key === 'Escape') {
+                modal.remove();
+                document.removeEventListener('keydown', closeModalOnEsc);
+            }
+        });
+    }
+
+    async openProject(projectId) {
+        try {
+            const token = Cookies.get('token');
+            const response = await fetch(`/api/frontend/project/${projectId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load project');
+            }
+
+            const project = await response.json();
+            
+            // Load project data
+            document.getElementById('project-name').value = project.name;
+            
+            // Load files
+            this.html = project.files?.html?.['index.html'] || '';
+            this.css = project.files?.css?.['style.css'] || '';
+            this.js = project.files?.js?.['script.js'] || '';
+            
+            // Update editors
+            const htmlEditor = document.getElementById('html-editor');
+            const cssEditor = document.getElementById('css-editor');
+            const jsEditor = document.getElementById('js-editor');
+            
+            if (htmlEditor) htmlEditor.value = this.html;
+            if (cssEditor) cssEditor.value = this.css;
+            if (jsEditor) jsEditor.value = this.js;
+            
+            // Update preview
+            this.updatePreview();
+            
+            // Save to localStorage
+            this.saveToLocalStorage();
+            
+            // Close projects modal
+            document.querySelector('.projects-modal')?.remove();
+            
+            this.showNotification('Project loaded successfully!');
+            
+        } catch (error) {
+            console.error('Error opening project:', error);
+            alert('Error opening project: ' + error.message);
+        }
+    }
+
+    async deleteProject(projectId, projectName) {
+        if (!confirm(`Are you sure you want to delete "${projectName}"?`)) {
+            return;
+        }
+
+        try {
+            const token = Cookies.get('token');
+            const response = await fetch(`/api/frontend/project/${projectId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to delete project');
+            }
+
+            // Remove from UI
+            const projectCard = document.querySelector(`[onclick*="${projectId}"]`)?.closest('.project-card');
+            if (projectCard) {
+                projectCard.remove();
+            }
+            
+            // If no projects left, show message
+            const projectsList = document.getElementById('projects-list');
+            if (projectsList && projectsList.children.length === 0) {
+                projectsList.innerHTML = '<p style="text-align: center; color: #888; padding: 40px;">No projects found. Create your first project!</p>';
+            }
+            
+            this.showNotification('Project deleted successfully!');
+            
+        } catch (error) {
+            console.error('Error deleting project:', error);
+            alert('Error deleting project: ' + error.message);
+        }
+    }
+
+    escapeHtml(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
     }
 }
 
