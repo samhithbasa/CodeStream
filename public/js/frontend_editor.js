@@ -184,15 +184,119 @@ class SimpleFrontendEditor {
         if (tabName === 'preview') this.updatePreview();
     }
 
+    // ========== STEP 3: Helper method to extract and fix inline handlers ==========
+    extractAndFixInlineHandlers(html) {
+        // Find all elements with onclick, onchange, etc. handlers
+        const handlers = ['onclick', 'onchange', 'oninput', 'onsubmit', 'onkeypress', 'onkeydown', 'onkeyup'];
+        
+        let fixedHTML = html;
+        
+        handlers.forEach(handler => {
+            const regex = new RegExp(`${handler}="([^"]+)"`, 'gi');
+            fixedHTML = fixedHTML.replace(regex, (match, code) => {
+                // Wrap the handler code to ensure it executes in global scope
+                return `${handler}="(function(){ try { ${code} } catch(e){ console.error(e); } })()"`;
+            });
+        });
+        
+        return fixedHTML;
+    }
+
+    // ========== STEP 5: Event delegation for better reliability ==========
+    generateEventDelegationCode() {
+        return `
+        // Event delegation for buttons
+        document.addEventListener('click', function(e) {
+            const button = e.target.closest('button');
+            if (!button) return;
+            
+            const onclick = button.getAttribute('onclick');
+            if (onclick) {
+                try {
+                    eval(onclick);
+                } catch(error) {
+                    console.error('Button click error:', error);
+                }
+            }
+        });
+        
+        // Also handle other events
+        document.addEventListener('input', function(e) {
+            const oninput = e.target.getAttribute('oninput');
+            if (oninput) {
+                try {
+                    eval(oninput);
+                } catch(error) {
+                    console.error('Input event error:', error);
+                }
+            }
+        });
+        
+        document.addEventListener('change', function(e) {
+            const onchange = e.target.getAttribute('onchange');
+            if (onchange) {
+                try {
+                    eval(onchange);
+                } catch(error) {
+                    console.error('Change event error:', error);
+                }
+            }
+        });
+        
+        // Handle key events
+        document.addEventListener('keypress', function(e) {
+            const onkeypress = e.target.getAttribute('onkeypress');
+            if (onkeypress) {
+                try {
+                    eval(onkeypress);
+                } catch(error) {
+                    console.error('Keypress event error:', error);
+                }
+            }
+        });
+        `;
+    }
+
+    processJavaScriptForDeployment(js) {
+        // Extract all function declarations and make them global
+        let processed = js;
+        
+        // Match function declarations like: function myFunc() { ... }
+        const functionRegex = /function\s+(\w+)\s*\([^)]*\)\s*\{/g;
+        let match;
+        let functions = [];
+        
+        while ((match = functionRegex.exec(js)) !== null) {
+            functions.push(match[1]);
+        }
+        
+        // Also find arrow functions and const/let functions
+        const arrowFunctionRegex = /(const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>/g;
+        while ((match = arrowFunctionRegex.exec(js)) !== null) {
+            functions.push(match[2]);
+        }
+        
+        // Add window. prefix to make functions global
+        functions.forEach(func => {
+            // Replace function declarations
+            const funcDeclarationRegex = new RegExp(`function\\s+${func}\\s*\\([^)]*\\)\\s*\\{`, 'g');
+            processed = processed.replace(funcDeclarationRegex, `window.${func} = function(`);
+            
+            // Replace arrow functions
+            const arrowFuncRegex = new RegExp(`(const|let|var)\\s+${func}\\s*=\\s*(?:async\\s*)?\\([^)]*\\)\\s*=>`, 'g');
+            processed = processed.replace(arrowFuncRegex, `window.${func} = `);
+        });
+        
+        return processed;
+    }
+
     generateHTML() {
         const projectName = document.getElementById('project-name')?.value || 'My Project';
         
-        // FIX: Properly escape JavaScript
-        const escapedJS = this.js
-            .replace(/<\/script>/gi, '<\\/script>')
-            .replace(/`/g, '\\`')
-            .replace(/\${/g, '\\${');
-
+        // Process JavaScript to make functions global for preview
+        const processedJS = this.processJavaScriptForDeployment(this.js);
+        const eventDelegationCode = this.generateEventDelegationCode();
+        
         return `<!DOCTYPE html>
 <html>
 <head>
@@ -206,19 +310,23 @@ class SimpleFrontendEditor {
 <body>
     ${this.html}
     <script>
+        // Event delegation for reliable button handling
+        ${eventDelegationCode}
+        
+        // User's JavaScript (made global)
         try {
-            ${escapedJS}
+            ${processedJS}
         } catch (error) {
             console.error('JavaScript error:', error);
         }
         
-        // Make sure DOM is loaded
+        // Handle DOM ready
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', function() {
-                console.log('Project loaded successfully');
+                console.log('Preview loaded successfully');
             });
         } else {
-            console.log('Project loaded successfully');
+            console.log('Preview loaded successfully');
         }
     </script>
 </body>
@@ -241,6 +349,47 @@ class SimpleFrontendEditor {
         }
     }
 
+    generateSimpleDeploymentHTML(html, css, js) {
+        const projectName = document.getElementById('project-name')?.value || 'My Project';
+        
+        // Fix inline handlers in HTML
+        const fixedHTML = this.extractAndFixInlineHandlers(html);
+        
+        // Process JavaScript
+        const processedJS = this.processJavaScriptForDeployment(js);
+        
+        // Get event delegation code
+        const eventDelegationCode = this.generateEventDelegationCode();
+        
+        return `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${projectName}</title>
+    <style>
+        ${css}
+    </style>
+</head>
+<body>
+    ${fixedHTML}
+    <script>
+        // Event delegation for reliable button handling
+        ${eventDelegationCode}
+        
+        // User's JavaScript (made global)
+        try {
+            ${processedJS}
+        } catch (error) {
+            console.error('JavaScript error:', error);
+        }
+        
+        console.log('Project "${projectName}" loaded');
+    </script>
+</body>
+</html>`;
+    }
+
     toggleFullscreenPreview() {
         const previewFrame = document.getElementById('preview-frame');
         if (!previewFrame) return;
@@ -257,6 +406,100 @@ class SimpleFrontendEditor {
             if (container) {
                 container.classList.remove('preview-fullscreen');
             }
+        }
+    }
+
+    // ========== UPDATED saveProject method ==========
+    async saveProject() {
+        const token = Cookies.get('token');
+        if (!token) {
+            alert('Please login to save your project');
+            return;
+        }
+
+        const saveBtn = document.getElementById('save-project');
+        const originalText = saveBtn ? saveBtn.innerHTML : 'Save';
+
+        // Add saving state
+        if (saveBtn) {
+            saveBtn.innerHTML = '💾 Saving...';
+            saveBtn.classList.add('saving');
+            saveBtn.disabled = true;
+        }
+
+        const projectName = document.getElementById('project-name')?.value.trim() || 'Untitled Project';
+
+        try {
+            // Use original HTML, CSS, JS
+            const htmlContent = this.html;
+            const cssContent = this.css;
+            const jsContent = this.js;
+
+            // Generate deployment HTML with all fixes
+            const deploymentHTML = this.generateSimpleDeploymentHTML(htmlContent, cssContent, jsContent);
+
+            console.log('Saving project with fixed deployment HTML');
+
+            const response = await fetch('/api/frontend/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    name: projectName,
+                    files: {
+                        html: { 'index.html': htmlContent },
+                        css: { 'style.css': cssContent },
+                        js: { 'script.js': jsContent }
+                    },
+                    assets: [],
+                    deploymentHTML: deploymentHTML
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.currentProjectId = result.projectId;
+                const shareUrl = result.shareUrl;
+                navigator.clipboard.writeText(shareUrl).then(() => {
+                    this.showSuccessNotification(shareUrl);
+                });
+                
+                if (saveBtn) {
+                    saveBtn.innerHTML = '✅ Saved!';
+                    setTimeout(() => {
+                        saveBtn.innerHTML = originalText;
+                    }, 2000);
+                }
+            } else {
+                alert('Failed to save project: ' + result.error);
+                if (saveBtn) saveBtn.innerHTML = originalText;
+            }
+        } catch (error) {
+            console.error('Error saving project:', error);
+            alert('Error saving project. Please try again.');
+            if (saveBtn) {
+                saveBtn.innerHTML = '❌ Failed';
+                setTimeout(() => {
+                    saveBtn.innerHTML = originalText;
+                }, 2000);
+            }
+        } finally {
+            if (saveBtn) {
+                saveBtn.classList.remove('saving');
+                saveBtn.disabled = false;
+            }
+        }
+    }
+
+    showSuccessNotification(url) {
+        const n = document.getElementById('success-notification');
+        if (n) {
+            n.innerHTML = `<span>✓</span> Project saved! Share URL: <a href="${url}" target="_blank" style="color: white; text-decoration: underline;">${url}</a>`;
+            n.style.display = 'flex';
+            setTimeout(() => (n.style.display = 'none'), 5000);
         }
     }
 
@@ -377,150 +620,6 @@ class SimpleFrontendEditor {
             box.style.animation = 'slideOutRight .3s ease';
             setTimeout(() => box.remove(), 300);
         }, 3000);
-    }
-
-    async saveProject() {
-        const token = Cookies.get('token');
-        if (!token) {
-            alert('Please login to save your project');
-            return;
-        }
-
-        const saveBtn = document.getElementById('save-project');
-        const originalText = saveBtn ? saveBtn.innerHTML : 'Save';
-
-        // Add saving state
-        if (saveBtn) {
-            saveBtn.innerHTML = '💾 Saving...';
-            saveBtn.classList.add('saving');
-            saveBtn.disabled = true;
-        }
-
-        const projectName = document.getElementById('project-name')?.value.trim() || 'Untitled Project';
-
-        try {
-            const htmlContent = this.html;
-            const cssContent = this.css;
-            const jsContent = this.js;
-
-            // Generate SIMPLE deployment HTML - just plain HTML/CSS/JS
-            const deploymentHTML = this.generateSimpleDeploymentHTML(htmlContent, cssContent, jsContent);
-
-            console.log('Saving project with deployment HTML:', deploymentHTML.length);
-
-            const response = await fetch('/api/frontend/save', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    name: projectName,
-                    files: {
-                        html: { 'index.html': htmlContent },
-                        css: { 'style.css': cssContent },
-                        js: { 'script.js': jsContent }
-                    },
-                    assets: [],
-                    deploymentHTML: deploymentHTML
-                })
-            });
-
-            const result = await response.json();
-
-            if (result.success) {
-                this.currentProjectId = result.projectId;
-                const shareUrl = result.shareUrl;
-                navigator.clipboard.writeText(shareUrl).then(() => {
-                    this.showSuccessNotification(shareUrl);
-                });
-                
-                if (saveBtn) {
-                    saveBtn.innerHTML = '✅ Saved!';
-                    setTimeout(() => {
-                        saveBtn.innerHTML = originalText;
-                    }, 2000);
-                }
-            } else {
-                alert('Failed to save project: ' + result.error);
-                if (saveBtn) saveBtn.innerHTML = originalText;
-            }
-        } catch (error) {
-            console.error('Error saving project:', error);
-            alert('Error saving project. Please try again.');
-            if (saveBtn) {
-                saveBtn.innerHTML = '❌ Failed';
-                setTimeout(() => {
-                    saveBtn.innerHTML = originalText;
-                }, 2000);
-            }
-        } finally {
-            if (saveBtn) {
-                saveBtn.classList.remove('saving');
-                saveBtn.disabled = false;
-            }
-        }
-    }
-
-    generateSimpleDeploymentHTML(html, css, js) {
-        const projectName = document.getElementById('project-name')?.value || 'My Project';
-        
-        // Properly escape all content
-        const escapedJS = this.escapeJavaScript(js);
-        const escapedCSS = css.replace(/<\/style>/gi, '<\\/style>');
-        
-        return `<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${projectName}</title>
-    <style>
-        ${escapedCSS}
-    </style>
-</head>
-<body>
-    ${html}
-    <script>
-        // Wait for DOM to be ready
-        function initProject() {
-            try {
-                ${escapedJS}
-            } catch (error) {
-                console.error('JavaScript error:', error);
-            }
-            console.log('Project "${projectName}" loaded successfully');
-        }
-        
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initProject);
-        } else {
-            initProject();
-        }
-    </script>
-</body>
-</html>`;
-    }
-
-    escapeJavaScript(js) {
-        return js
-            .replace(/\\/g, '\\\\') // Escape backslashes first
-            .replace(/'/g, "\\'") // Escape single quotes
-            .replace(/"/g, '\\"') // Escape double quotes
-            .replace(/`/g, '\\`') // Escape backticks
-            .replace(/\n/g, '\\n') // Escape newlines
-            .replace(/\r/g, '\\r') // Escape carriage returns
-            .replace(/<\/script>/gi, '<\\/script>') // Escape script tags
-            .replace(/<\/script/gi, '<\\/script'); // Also escape incomplete tags
-    }
-
-    showSuccessNotification(url) {
-        const n = document.getElementById('success-notification');
-        if (n) {
-            n.innerHTML = `<span>✓</span> Project saved! Share URL: <a href="${url}" target="_blank" style="color: white; text-decoration: underline;">${url}</a>`;
-            n.style.display = 'flex';
-            setTimeout(() => (n.style.display = 'none'), 5000);
-        }
     }
 
     async showProjects() {
