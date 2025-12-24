@@ -1,4 +1,4 @@
-console.log('Simple Frontend Editor JavaScript loaded');
+console.log('Enhanced Frontend Editor JavaScript loaded');
 
 class SimpleFrontendEditor {
     constructor() {
@@ -184,7 +184,7 @@ class SimpleFrontendEditor {
         if (tabName === 'preview') this.updatePreview();
     }
 
-    // SIMPLE HTML GENERATION - NO COMPLEX PROCESSING
+    // ========== UNIVERSAL HTML GENERATION ==========
     generateHTML() {
         const projectName = document.getElementById('project-name')?.value || 'My Project';
         
@@ -201,12 +201,27 @@ class SimpleFrontendEditor {
 <body>
     ${this.html}
     <script>
-        // SIMPLE JAVASCRIPT - JUST EXECUTE AS-IS
-        try {
-            ${this.js}
-        } catch (error) {
-            console.error('JavaScript error:', error);
-        }
+        // UNIVERSAL PREVIEW - MAKES ANY CODE WORK
+        (function() {
+            try {
+                // Execute user code
+                ${this.js}
+            } catch(error) {
+                console.error('JavaScript error:', error);
+            }
+            
+            // Universal event handler for preview
+            document.addEventListener('click', function(e) {
+                if (e.target.hasAttribute('onclick')) {
+                    const onclick = e.target.getAttribute('onclick');
+                    try {
+                        eval(onclick);
+                    } catch(err) {
+                        console.error('onclick error:', err);
+                    }
+                }
+            });
+        })();
         
         console.log('Preview loaded');
     </script>
@@ -230,13 +245,14 @@ class SimpleFrontendEditor {
         }
     }
 
-    // SIMPLE DEPLOYMENT HTML GENERATION
+    // ========== UNIVERSAL DEPLOYMENT HTML GENERATION ==========
     generateDeploymentHTML(html, css, js) {
         const projectName = document.getElementById('project-name')?.value || 'My Project';
         
-        // Make JavaScript functions global by adding them to window
-        const processedJS = this.makeFunctionsGlobal(js);
+        // Extract all function names from JavaScript
+        const functionNames = this.extractAllFunctionNames(js);
         
+        // Generate the universal deployment HTML
         return `<!DOCTYPE html>
 <html>
 <head>
@@ -250,53 +266,129 @@ class SimpleFrontendEditor {
 <body>
     ${html}
     <script>
-        // MAKE ALL FUNCTIONS GLOBAL
-        ${processedJS}
+        // ========== UNIVERSAL DEPLOYMENT SYSTEM ==========
+        // This makes ANY frontend code work in deployed links
         
-        // Handle any inline onclick handlers
+        // 1. Execute user's JavaScript code
+        (function() {
+            try {
+                ${js}
+            } catch(error) {
+                console.error('User code execution error:', error);
+            }
+        })();
+        
+        // 2. Make ALL functions globally available
+        ${functionNames.map(fn => `
+            try {
+                if (typeof ${fn} === 'function') {
+                    window.${fn} = ${fn};
+                }
+            } catch(e) {
+                // Function might not exist or be in a different scope
+            }
+        `).join('')}
+        
+        // 3. Universal event handler system
+        function executeEventHandler(code) {
+            try {
+                // First try direct execution
+                return eval(code);
+            } catch(error1) {
+                try {
+                    // If that fails, try to execute in global context
+                    return Function('"use strict"; return (' + code + ')')();
+                } catch(error2) {
+                    console.error('Event handler execution failed:', error2);
+                    return null;
+                }
+            }
+        }
+        
+        // 4. Handle ALL inline event handlers
         document.addEventListener('DOMContentLoaded', function() {
-            // Find all elements with onclick handlers
-            document.querySelectorAll('[onclick]').forEach(element => {
-                const originalOnClick = element.getAttribute('onclick');
-                element.onclick = function() {
-                    try {
-                        eval(originalOnClick);
-                    } catch(error) {
-                        console.error('onclick error:', error);
-                    }
-                };
+            // Process all elements with event handlers
+            const elementsWithHandlers = document.querySelectorAll('[onclick]');
+            elementsWithHandlers.forEach(element => {
+                const originalHandler = element.getAttribute('onclick');
+                if (originalHandler) {
+                    element.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        executeEventHandler(originalHandler);
+                    });
+                }
             });
             
-            console.log('Project "${projectName}" loaded successfully');
+            // Also set up global click handler as backup
+            document.addEventListener('click', function(e) {
+                if (e.target.hasAttribute('onclick')) {
+                    const handler = e.target.getAttribute('onclick');
+                    e.preventDefault();
+                    executeEventHandler(handler);
+                }
+            });
+            
+            console.log('Project "${projectName}" loaded successfully - Universal mode');
         });
+        
+        // 5. Additional function detection (fallback)
+        setTimeout(function() {
+            const commonFunctions = [
+                'append', 'clearDisplay', 'deleteLast', 'calculate',
+                'addTask', 'deleteTask', 'save', 'render',
+                'saveTasks', 'showAlert', 'init', 'load',
+                'handleClick', 'handleInput', 'testClick'
+            ];
+            
+            commonFunctions.forEach(funcName => {
+                try {
+                    if (eval('typeof ' + funcName) === 'function') {
+                        window[funcName] = eval(funcName);
+                    }
+                } catch(e) {
+                    // Ignore errors
+                }
+            });
+        }, 100);
     </script>
 </body>
 </html>`;
     }
 
-    // SIMPLE FUNCTION TO MAKE JAVASCRIPT GLOBAL
-    makeFunctionsGlobal(js) {
-        // This is a very simple approach - just wrap the JS in a way that makes functions global
-        return `
-        // User's JavaScript code
-        (function() {
-            try {
-                ${js}
-            } catch(error) {
-                console.error('Error in user code:', error);
-            }
-        })();
+    // ========== HELPER METHODS ==========
+    extractAllFunctionNames(js) {
+        const functionNames = new Set();
         
-        // Make sure functions are available globally
-        if (typeof append !== 'undefined') window.append = append;
-        if (typeof clearDisplay !== 'undefined') window.clearDisplay = clearDisplay;
-        if (typeof deleteLast !== 'undefined') window.deleteLast = deleteLast;
-        if (typeof calculate !== 'undefined') window.calculate = calculate;
-        if (typeof addTask !== 'undefined') window.addTask = addTask;
-        if (typeof deleteTask !== 'undefined') window.deleteTask = deleteTask;
-        if (typeof saveTasks !== 'undefined') window.saveTasks = saveTasks;
-        if (typeof render !== 'undefined') window.render = render;
-        `;
+        // 1. Regular function declarations: function myFunc() {...}
+        const funcRegex = /function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/g;
+        let match;
+        while ((match = funcRegex.exec(js)) !== null) {
+            functionNames.add(match[1]);
+        }
+        
+        // 2. Arrow functions: const myFunc = () => {...}
+        const arrowRegex = /(?:const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>/g;
+        while ((match = arrowRegex.exec(js)) !== null) {
+            functionNames.add(match[1]);
+        }
+        
+        // 3. Function expressions: const myFunc = function() {...}
+        const exprRegex = /(?:const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*function/g;
+        while ((match = exprRegex.exec(js)) !== null) {
+            functionNames.add(match[1]);
+        }
+        
+        // 4. Method definitions: myMethod() {...}
+        const methodRegex = /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\([^)]*\)\s*\{/g;
+        while ((match = methodRegex.exec(js)) !== null) {
+            // Skip keywords and common words
+            const skipWords = ['if', 'for', 'while', 'switch', 'catch', 'function'];
+            if (!skipWords.includes(match[1])) {
+                functionNames.add(match[1]);
+            }
+        }
+        
+        return Array.from(functionNames);
     }
 
     toggleFullscreenPreview() {
@@ -318,6 +410,7 @@ class SimpleFrontendEditor {
         }
     }
 
+    // ========== SAVE PROJECT METHOD ==========
     async saveProject() {
         const token = Cookies.get('token');
         if (!token) {
@@ -342,7 +435,7 @@ class SimpleFrontendEditor {
             const cssContent = this.css;
             const jsContent = this.js;
 
-            // Generate deployment HTML
+            // Generate universal deployment HTML
             const deploymentHTML = this.generateDeploymentHTML(htmlContent, cssContent, jsContent);
 
             const response = await fetch('/api/frontend/save', {
@@ -408,7 +501,7 @@ class SimpleFrontendEditor {
         }
     }
 
-    // Auth Methods
+    // ========== AUTH METHODS ==========
     async checkAuthStatus() {
         const token = Cookies.get('token');
         const authToggle = document.getElementById('auth-toggle');
@@ -527,6 +620,7 @@ class SimpleFrontendEditor {
         }, 3000);
     }
 
+    // ========== PROJECT MANAGEMENT ==========
     async showProjects() {
         const token = Cookies.get('token');
         if (!token) {

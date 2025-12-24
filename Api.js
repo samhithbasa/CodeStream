@@ -1237,36 +1237,27 @@ app.get('/frontend/:projectId/:filename', (req, res) => {
 app.get('/frontend/:id', (req, res) => {
     try {
         const projectId = req.params.id;
-
-        // Safety check
-        if (projectId.includes('..')) {
-            return res.status(400).send('Invalid project ID');
-        }
-
         const projectPath = path.join(FRONTEND_STORAGE_DIR, `${projectId}.json`);
 
         if (!fs.existsSync(projectPath)) {
-            return res.status(404).send(`
-                <html>
-                    <body>
-                        <h1>Project Not Found</h1>
-                        <p>The requested project does not exist.</p>
-                    </body>
-                </html>
-            `);
+            return res.status(404).send('Project not found');
         }
 
         const projectData = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
         
-        // Generate or use deployment HTML
-        const html = generateDeployedHTML(projectData);
+        // Use the deploymentHTML if it exists
+        if (projectData.deploymentHTML) {
+            res.setHeader('Content-Type', 'text/html');
+            return res.send(projectData.deploymentHTML);
+        }
         
-        // Send the HTML directly
+        // Fallback to simple generation
+        const simpleHTML = generateSimpleDeployedHTML(projectData);
         res.setHeader('Content-Type', 'text/html');
-        res.send(html);
+        res.send(simpleHTML);
 
     } catch (error) {
-        console.error('Error serving frontend project:', error);
+        console.error('Error serving project:', error);
         res.status(500).send('Error loading project');
     }
 });
