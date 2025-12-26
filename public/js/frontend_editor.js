@@ -188,6 +188,9 @@ class SimpleFrontendEditor {
     generateHTML() {
         const projectName = document.getElementById('project-name')?.value || 'My Project';
 
+        // Auto-wrap JavaScript for preview too
+        const processedJS = this.autoWrapJavaScript(this.js);
+
         return `<!DOCTYPE html>
 <html>
 <head>
@@ -201,11 +204,14 @@ class SimpleFrontendEditor {
 <body>
     ${this.html}
     <script>
-        // UNIVERSAL PREVIEW - MAKES ANY CODE WORK
+        // UNIVERSAL PREVIEW - AUTO-WRAPPED
         (function() {
             try {
-                // Execute user code
+                // User's original code
                 ${this.js}
+                
+                // Auto-wrapped version
+                ${processedJS}
             } catch(error) {
                 console.error('JavaScript error:', error);
             }
@@ -249,7 +255,9 @@ class SimpleFrontendEditor {
     generateDeploymentHTML(html, css, js) {
         const projectName = document.getElementById('project-name')?.value || 'My Project';
 
-        // SIMPLIFIED VERSION - Just make everything work
+        // AUTO-WRAP JavaScript to make all functions globally available
+        const processedJS = this.autoWrapJavaScript(js);
+
         return `<!DOCTYPE html>
 <html>
 <head>
@@ -263,125 +271,149 @@ class SimpleFrontendEditor {
 <body>
     ${html}
     <script>
-        // === UNIVERSAL JAVASCRIPT HANDLER ===
-        // This makes ANY frontend code work
+        // === AUTO-WRAPPED JAVASCRIPT ===
+        // All functions are automatically made global
         
-        // 1. Execute the user's code
+        // 1. Execute the user's original code first
         try {
-            // First, run the user's JavaScript
             (function() {
+                // User's original code (preserved for debugging)
                 ${js}
             })();
         } catch(error) {
             console.error('User code error:', error);
         }
         
-        // 2. Universal event handler system
+        // 2. AUTO-WRAPPED VERSION - Makes everything work automatically
+        (function() {
+            // Processed version with auto-wrapped functions
+            ${processedJS}
+        })();
+        
+        // 3. Universal event handler for onclick events
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM loaded - setting up universal handlers');
+            console.log('Deployed project loaded: "${projectName}"');
             
-            // Find all elements with onclick and attach event listeners
-            const elementsWithOnClick = document.querySelectorAll('[onclick]');
-            elementsWithOnClick.forEach(element => {
-                const originalHandler = element.getAttribute('onclick');
-                if (originalHandler) {
-                    // Remove the onclick attribute to prevent conflicts
-                    element.removeAttribute('onclick');
-                    
-                    // Add event listener
-                    element.addEventListener('click', function(e) {
-                        try {
-                            // Execute the handler code
-                            eval(originalHandler);
-                        } catch(error) {
-                            console.error('onclick execution error:', error, 'Handler:', originalHandler);
-                        }
-                    });
-                }
-            });
-            
-            // Global click handler as backup
+            // Auto-bind all onclick handlers
             document.addEventListener('click', function(e) {
-                const onclick = e.target.getAttribute('onclick');
-                if (onclick) {
-                    e.preventDefault();
+                if (e.target.hasAttribute('onclick')) {
+                    const handler = e.target.getAttribute('onclick');
                     try {
-                        eval(onclick);
+                        // Try to execute as is
+                        eval(handler);
                     } catch(error) {
-                        console.error('Global onclick error:', error);
+                        console.warn('onclick handler error:', error);
+                        // Try to find and call the function
+                        const funcName = handler.replace(/\(.*\)/, '').trim();
+                        if (typeof window[funcName] === 'function') {
+                            window[funcName]();
+                        }
                     }
                 }
             });
             
-            // Make common functions globally available
-            const commonFunctions = [
-                'append', 'clearDisplay', 'deleteLast', 'calculate',
-                'addTask', 'deleteTask', 'save', 'render',
-                'saveTasks', 'showAlert', 'init', 'load'
-            ];
-            
-            commonFunctions.forEach(funcName => {
-                try {
-                    if (typeof eval(funcName) === 'function') {
-                        window[funcName] = eval(funcName);
-                    }
-                } catch(e) {
-                    // Ignore - function doesn't exist
-                }
-            });
-            
-            console.log('Universal handlers setup complete for project: "${projectName}"');
+            // Auto-call init() or main() if they exist
+            setTimeout(() => {
+                if (typeof window.init === 'function') window.init();
+                if (typeof window.main === 'function') window.main();
+                if (typeof window.onload === 'function') window.onload();
+            }, 100);
         });
         
-        // 3. Fallback: If DOMContentLoaded already fired, run setup immediately
+        // 4. Make sure DOMContentLoaded fires even if already loaded
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', function() {
                 console.log('DOMContentLoaded fired');
             });
         } else {
-            console.log('DOM already loaded, running setup');
-            // Run setup immediately
-            const event = new Event('DOMContentLoaded');
-            document.dispatchEvent(event);
+            console.log('DOM already loaded, triggering event');
+            document.dispatchEvent(new Event('DOMContentLoaded'));
         }
     </script>
 </body>
 </html>`;
     }
 
-    // ========== HELPER METHODS ==========
+    // ========== AUTO-WRAP JAVASCRIPT HELPER ==========
+    autoWrapJavaScript(js) {
+        if (!js.trim()) return js;
+
+        console.log('Auto-wrapping JavaScript for global access...');
+
+        // Keep a copy of original code for reference
+        let processed = js;
+
+        // 1. Convert regular function declarations to window assignments
+        // Matches: function myFunc() { ... }
+        processed = processed.replace(
+            /function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(([^)]*)\)\s*\{/g,
+            (match, funcName, params) => {
+                console.log(`Auto-wrapping function: ${funcName}`);
+                return `window.${funcName} = function(${params}) {`;
+            }
+        );
+
+        // 2. Convert const/let/var function assignments
+        // Matches: const myFunc = function() { ... }
+        // Matches: const myFunc = () => { ... }
+        processed = processed.replace(
+            /(const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(?:async\s*)?(?:function\s*\(([^)]*)\)|\(([^)]*)\)\s*=>)\s*\{/g,
+            (match, declaration, funcName, funcParams, arrowParams) => {
+                console.log(`Auto-wrapping variable function: ${funcName}`);
+                const params = funcParams || arrowParams || '';
+                return `${declaration} ${funcName} = function(${params}) { window.${funcName} = ${funcName};`;
+            }
+        );
+
+        // 3. Also assign to window at the end of the function
+        // This ensures functions declared inside other scopes still become global
+        const functionNames = this.extractAllFunctionNames(js);
+
+        // Add window assignments for all detected functions
+        if (functionNames.length > 0) {
+            console.log(`Found functions to make global: ${functionNames.join(', ')}`);
+
+            // Add at the beginning of the script
+            const windowAssignments = functionNames.map(funcName =>
+                `if (typeof ${funcName} === 'function' && !window.${funcName}) window.${funcName} = ${funcName};`
+            ).join('\n');
+
+            processed = windowAssignments + '\n' + processed;
+        }
+
+        return processed;
+    }
+
+    // ========== IMPROVED FUNCTION EXTRACTION ==========
     extractAllFunctionNames(js) {
         const functionNames = new Set();
 
-        // 1. Regular function declarations: function myFunc() {...}
+        // 1. Regular function declarations
         const funcRegex = /function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/g;
         let match;
         while ((match = funcRegex.exec(js)) !== null) {
             functionNames.add(match[1]);
         }
 
-        // 2. Arrow functions: const myFunc = () => {...}
+        // 2. Arrow functions assigned to variables
         const arrowRegex = /(?:const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>/g;
         while ((match = arrowRegex.exec(js)) !== null) {
             functionNames.add(match[1]);
         }
 
-        // 3. Function expressions: const myFunc = function() {...}
+        // 3. Function expressions
         const exprRegex = /(?:const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*function/g;
         while ((match = exprRegex.exec(js)) !== null) {
             functionNames.add(match[1]);
         }
 
-        // 4. Method definitions: myMethod() {...}
-        const methodRegex = /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\([^)]*\)\s*\{/g;
+        // 4. Method assignments
+        const methodRegex = /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:\s*function/g;
         while ((match = methodRegex.exec(js)) !== null) {
-            // Skip keywords and common words
-            const skipWords = ['if', 'for', 'while', 'switch', 'catch', 'function'];
-            if (!skipWords.includes(match[1])) {
-                functionNames.add(match[1]);
-            }
+            functionNames.add(match[1]);
         }
 
+        console.log(`Extracted function names: ${Array.from(functionNames)}`);
         return Array.from(functionNames);
     }
 
