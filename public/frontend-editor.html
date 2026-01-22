@@ -20,8 +20,6 @@
                 💾 Save & Deploy
             </button>
             <button id="theme-toggle" class="btn btn-secondary">🌙 Toggle Theme</button>
-
-            <!-- Dynamic Login/Logout Toggle Button -->
             <button id="auth-toggle" class="btn btn-login">
                 🔐 Login
             </button>
@@ -29,6 +27,49 @@
     </header>
 
     <div class="container">
+        <!-- File Manager Sidebar -->
+        <div class="file-manager">
+            <div class="file-manager-header">
+                <button id="add-html-file" class="btn btn-small">+ HTML</button>
+                <button id="add-css-file" class="btn btn-small">+ CSS</button>
+                <button id="add-js-file" class="btn btn-small">+ JS</button>
+                <button id="upload-assets" class="btn btn-small">📁 Upload Assets</button>
+            </div>
+            
+            <div class="file-tree">
+                <div class="file-tree-item active" data-type="html" data-filename="index.html">
+                    📄 index.html
+                    <span class="file-actions">
+                        <button class="btn-rename">✏️</button>
+                        <button class="btn-delete">🗑️</button>
+                    </span>
+                </div>
+                <div class="file-tree-item" data-type="css" data-filename="style.css">
+                    📄 style.css
+                    <span class="file-actions">
+                        <button class="btn-rename">✏️</button>
+                        <button class="btn-delete">🗑️</button>
+                    </span>
+                </div>
+                <div class="file-tree-item" data-type="js" data-filename="script.js">
+                    📄 script.js
+                    <span class="file-actions">
+                        <button class="btn-rename">✏️</button>
+                        <button class="btn-delete">🗑️</button>
+                    </span>
+                </div>
+            </div>
+            
+            <!-- Asset manager section -->
+            <div class="assets-manager">
+                <h4>📁 Assets</h4>
+                <div id="assets-list" class="assets-list">
+                    <!-- Assets will appear here -->
+                </div>
+                <input type="file" id="asset-upload" multiple accept=".jpg,.jpeg,.png,.gif,.svg,.ico,.webp,.mp3,.mp4,.pdf,.zip,.txt" style="display: none;">
+            </div>
+        </div>
+
         <!-- Main Editor Area -->
         <div class="editor-panel">
             <div class="editor-tabs">
@@ -125,6 +166,18 @@ document.addEventListener('DOMContentLoaded', function() {
         <span>✓</span> Project saved successfully! Share URL copied to clipboard.
     </div>
 
+    <!-- File Rename Modal -->
+    <div id="rename-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3>Rename File</h3>
+            <input type="text" id="rename-input" placeholder="Enter new filename">
+            <div class="modal-actions">
+                <button id="rename-cancel" class="btn btn-secondary">Cancel</button>
+                <button id="rename-confirm" class="btn btn-primary">Rename</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         console.log('=== DEBUG: Token handler script loaded ===');
 
@@ -132,7 +185,6 @@ document.addEventListener('DOMContentLoaded', function() {
         function showEditorSelectionPopup() {
             console.log('DEBUG: showEditorSelectionPopup called');
 
-            // Create a beautiful popup
             const popupOverlay = document.createElement('div');
             popupOverlay.style.cssText = `
             position: fixed;
@@ -220,7 +272,6 @@ document.addEventListener('DOMContentLoaded', function() {
             popupOverlay.appendChild(popupContent);
             document.body.appendChild(popupOverlay);
 
-            // Add hover effects
             const stayBtn = document.getElementById('stay-here');
             const goBtn = document.getElementById('go-to-editor');
 
@@ -246,12 +297,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 goBtn.style.boxShadow = 'none';
             });
 
-            // Add event listeners
             stayBtn.addEventListener('click', function () {
                 console.log('DEBUG: User chose to stay on Frontend Playground');
                 document.body.removeChild(popupOverlay);
 
-                // Show a confirmation message
                 const confirmation = document.createElement('div');
                 confirmation.style.cssText = `
                 position: fixed;
@@ -277,7 +326,6 @@ document.addEventListener('DOMContentLoaded', function() {
             goBtn.addEventListener('click', function () {
                 console.log('DEBUG: User chose to go to Code Editor');
 
-                // Add loading effect
                 goBtn.innerHTML = '⏳ Redirecting...';
                 goBtn.disabled = true;
                 goBtn.style.opacity = '0.7';
@@ -287,7 +335,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }, 500);
             });
 
-            // Close on overlay click
             popupOverlay.addEventListener('click', function (e) {
                 if (e.target === popupOverlay) {
                     console.log('DEBUG: Popup closed by overlay click');
@@ -295,7 +342,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
 
-            // Add CSS animation for the popup
             const style = document.createElement('style');
             style.textContent = `
             @keyframes slideInRight {
@@ -341,7 +387,6 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
             document.head.appendChild(style);
 
-            // Add animation class to notes section
             const notesSection = popupContent.querySelector('div');
             notesSection.classList.add('popup-notes');
         }
@@ -366,7 +411,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!freshLogin) {
                     console.log('DEBUG: First time login, processing token...');
 
-                    // Store token in cookies
                     Cookies.set('token', token, {
                         expires: 7,
                         path: '/',
@@ -375,16 +419,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                     console.log('DEBUG: Token stored in cookies');
 
-                    // Mark as processed
                     sessionStorage.setItem('fresh_login', 'true');
                     console.log('DEBUG: fresh_login set in sessionStorage');
 
-                    // Clean URL
                     const cleanURL = window.location.pathname;
                     window.history.replaceState({}, document.title, cleanURL);
                     console.log('DEBUG: URL cleaned to:', cleanURL);
 
-                    // Show popup after a short delay to ensure page is ready
                     setTimeout(() => {
                         console.log('DEBUG: Showing selection popup');
                         showEditorSelectionPopup();
@@ -398,7 +439,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        // Also check on page load (in case DOMContentLoaded already fired)
+        // Also check on page load
         console.log('DEBUG: Script execution completed');
         if (document.readyState === 'loading') {
             console.log('DEBUG: Document still loading, waiting for DOMContentLoaded');
@@ -408,7 +449,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const token = urlParams.get('token');
             if (token && !sessionStorage.getItem('fresh_login')) {
                 console.log('DEBUG: Immediate token check - token found');
-                // Process immediately
                 Cookies.set('token', token, { expires: 7, path: '/' });
                 sessionStorage.setItem('fresh_login', 'true');
                 window.history.replaceState({}, document.title, window.location.pathname);

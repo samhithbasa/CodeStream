@@ -227,6 +227,163 @@ body {
     background: rgba(255, 255, 255, 0.05);
 }
 
+/* File Manager Styles */
+.file-manager {
+    width: 250px;
+    background: var(--bg-color);
+    border-right: 1px solid var(--border-color);
+    padding: 15px;
+    overflow-y: auto;
+}
+
+.file-manager-header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-bottom: 15px;
+}
+
+.file-tree {
+    margin-bottom: 20px;
+}
+
+.file-tree-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    margin: 5px 0;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+}
+
+.file-tree-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--accent-color);
+}
+
+.file-tree-item.active {
+    background: rgba(66, 153, 225, 0.2);
+    border-color: var(--accent-color);
+}
+
+.file-actions {
+    display: none;
+}
+
+.file-tree-item:hover .file-actions {
+    display: flex;
+    gap: 5px;
+}
+
+.btn-rename, .btn-delete {
+    background: none;
+    border: none;
+    color: var(--text-color);
+    cursor: pointer;
+    font-size: 12px;
+    opacity: 0.7;
+    padding: 2px;
+}
+
+.btn-rename:hover, .btn-delete:hover {
+    opacity: 1;
+}
+
+.assets-manager {
+    border-top: 1px solid var(--border-color);
+    padding-top: 15px;
+}
+
+.assets-list {
+    margin-top: 10px;
+}
+
+.asset-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 10px;
+    margin: 4px 0;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.asset-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.asset-preview {
+    max-width: 100%;
+    max-height: 100px;
+    margin: 5px 0;
+    border-radius: 4px;
+}
+
+/* Update container layout */
+.container {
+    display: flex;
+    height: calc(100vh - 70px);
+}
+
+.editor-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Multi-tab editor */
+.multi-editor-tabs {
+    display: flex;
+    gap: 5px;
+    padding: 10px;
+    background: var(--bg-color);
+    border-bottom: 1px solid var(--border-color);
+    overflow-x: auto;
+}
+
+.editor-tab {
+    padding: 8px 15px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-color);
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+}
+
+.editor-tab.active {
+    background: var(--accent-color);
+    color: white;
+}
+
+.editor-tab-close {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    font-size: 14px;
+    opacity: 0.7;
+    padding: 0;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.editor-tab-close:hover {
+    opacity: 1;
+}
+
 .editor-content {
     flex: 1;
     position: relative;

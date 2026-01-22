@@ -1067,22 +1067,37 @@ app.delete('/delete-code/:id', authenticateToken, (req, res) => {
 
 app.post('/api/frontend/save', authenticateToken, async (req, res) => {
     try {
-        const { name, files, assets, structure, deploymentHTML } = req.body;
+        const { name, files, assets, deploymentHTML } = req.body;
         const projectId = uuidv4();
+
+        // Validate files structure
+        const validatedFiles = {
+            html: files?.html || {},
+            css: files?.css || {},
+            js: files?.js || {}
+        };
+
+        // Validate assets (limit size)
+        const validatedAssets = (assets || []).slice(0, 20).map(asset => ({
+            name: asset.name,
+            type: asset.type,
+            size: asset.size,
+            data: asset.data // base64 encoded
+        }));
 
         const projectData = {
             id: projectId,
             name: name || 'Untitled Project',
-            files: files || {},
-            assets: assets || [],
-            structure: structure || {},
+            files: validatedFiles,
+            assets: validatedAssets,
             userId: req.user.userId,
             userEmail: req.user.email,
             createdAt: new Date(),
             updatedAt: new Date(),
-            deploymentHTML: deploymentHTML || generateDeployedHTML({
+            deploymentHTML: deploymentHTML || this.generateDeploymentHTML({
                 name: name || 'Untitled Project',
-                files: files || {}
+                files: validatedFiles,
+                assets: validatedAssets
             })
         };
 
@@ -1094,11 +1109,48 @@ app.post('/api/frontend/save', authenticateToken, async (req, res) => {
             success: true,
             projectId,
             shareUrl: `http://${req.headers.host}/frontend/${projectId}`,
-            message: 'Project saved successfully'
+            message: 'Project saved successfully',
+            stats: {
+                htmlFiles: Object.keys(validatedFiles.html || {}).length,
+                cssFiles: Object.keys(validatedFiles.css || {}).length,
+                jsFiles: Object.keys(validatedFiles.js || {}).length,
+                assets: validatedAssets.length
+            }
         });
     } catch (error) {
         console.error('Error saving frontend project:', error);
         res.status(500).json({ error: 'Failed to save project' });
+    }
+});
+
+// Serve project assets
+app.get('/api/frontend/assets/:projectId/:assetName', (req, res) => {
+    try {
+        const { projectId, assetName } = req.params;
+        const projectPath = path.join(FRONTEND_STORAGE_DIR, `${projectId}.json`);
+
+        if (!fs.existsSync(projectPath)) {
+            return res.status(404).json({ error: 'Project not found' });
+        }
+
+        const projectData = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
+        const asset = projectData.assets?.find(a => a.name === assetName);
+
+        if (!asset) {
+            return res.status(404).json({ error: 'Asset not found' });
+        }
+
+        // Set appropriate content type
+        res.setHeader('Content-Type', asset.type);
+        
+        // Send base64 data
+        const base64Data = asset.data.split(',')[1]; // Remove data URL prefix
+        const buffer = Buffer.from(base64Data, 'base64');
+        res.send(buffer);
+
+    } catch (error) {
+        console.error('Error serving asset:', error);
+        res.status(500).json({ error: 'Failed to serve asset' });
     }
 });
 
@@ -1204,23 +1256,37 @@ app.get('/api/frontend/project/:id', async (req, res) => {
 });
 
 function generateDeployedHTML(projectData) {
-    // If project has deploymentHTML, use it
-    if (projectData.deploymentHTML) {
-        console.log('[DEBUG] Using pre-generated deployment HTML');
-        return projectData.deploymentHTML;
+    const { files, assets, name } = projectData;
+
+    // Combine all CSS files
+    let combinedCSS = '';
+    if (files.css) {
+        Object.values(files.css).forEach(cssContent => {
+            combinedCSS += cssContent + '\n';
+        });
     }
 
-    console.log('[DEBUG] Generating universal deployment HTML');
+    // Combine all JS files
+    let combinedJS = '';
+    if (files.js) {
+        Object.values(files.js).forEach(jsContent => {
+            combinedJS += jsContent + '\n';
+        });
+    }
 
-    const { files, name } = projectData;
+    // Get main HTML file
+    const mainHTML = files.html?.['index.html'] || 
+                    files.html?.[Object.keys(files.html || {})[0]] || 
+                    '<h1>Project</h1>';
 
-    // Get the content from files
-    const htmlContent = files?.html?.['index.html'] || '<h1>Project</h1>';
-    const cssContent = files?.css?.['style.css'] || '';
-    const jsContent = files?.js?.['script.js'] || '';
-
-    // Extract function names from JavaScript
-    const functionNames = extractFunctionNames(jsContent);
+    // Generate asset references
+    const assetRefs = assets?.map(asset => {
+        const assetUrl = `/api/frontend/assets/${projectData.id}/${encodeURIComponent(asset.name)}`;
+        if (asset.type.startsWith('image/')) {
+            return `<img src="${assetUrl}" alt="${asset.name}" style="display:none;" id="asset-${asset.name}">`;
+        }
+        return '';
+    }).join('\n') || '';
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -1229,49 +1295,80 @@ function generateDeployedHTML(projectData) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${name || 'My Project'}</title>
     <style>
-        ${cssContent}
+        ${combinedCSS}
     </style>
 </head>
 <body>
-    ${htmlContent}
+    ${mainHTML}
+    ${assetRefs}
+    
     <script>
-        // Execute user's JavaScript
-        (function() {
-            try {
-                ${jsContent}
-            } catch(error) {
-                console.error('JavaScript error:', error);
-            }
-        })();
+        // Project data
+        window.projectData = {
+            name: "${name || 'Untitled'}",
+            files: ${JSON.stringify(files)},
+            assets: ${JSON.stringify(assets || [])}
+        };
         
-        // Make functions global
-        ${functionNames.map(fn => `
-            try {
-                if (typeof ${fn} === 'function') {
-                    window.${fn} = ${fn};
-                }
-            } catch(e) {}
-        `).join('\n')}
+        // User JavaScript
+        try {
+            ${combinedJS}
+        } catch(error) {
+            console.error('JavaScript error:', error);
+        }
+        
+        // Auto-wrap functions for global access
+        ${autoWrapJavaScript(combinedJS)}
         
         // Universal event handler
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('Project "${name || 'Untitled'}" deployed successfully');
+            
             // Handle onclick events
             document.addEventListener('click', function(e) {
                 if (e.target.hasAttribute('onclick')) {
-                    const handler = e.target.getAttribute('onclick');
                     try {
-                        eval(handler);
+                        eval(e.target.getAttribute('onclick'));
                     } catch(error) {
-                        console.error('onclick error:', error);
+                        console.error('onclick handler error:', error);
                     }
                 }
             });
             
-            console.log('Project "${name || 'Untitled'}" loaded');
+            // Auto-initialize common functions
+            if (typeof window.init === 'function') window.init();
+            if (typeof window.onLoad === 'function') window.onLoad();
+            if (typeof window.main === 'function') window.main();
         });
+        
+        // Fire DOMContentLoaded if already loaded
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {});
+        } else {
+            setTimeout(() => {
+                document.dispatchEvent(new Event('DOMContentLoaded'));
+            }, 100);
+        }
     </script>
 </body>
 </html>`;
+}
+
+// Helper function to auto-wrap JavaScript
+function autoWrapJavaScript(js) {
+    if (!js) return '';
+    
+    let wrapped = '';
+    
+    // Match function declarations
+    const funcRegex = /function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(([^)]*)\)\s*\{/g;
+    wrapped = js.replace(funcRegex, 'window.$1 = function($2) {');
+    
+    // Match arrow functions assigned to variables
+    const arrowRegex = /(const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(?:async\s*)?(?:function\s*\(([^)]*)\)|\(([^)]*)\)\s*=>)\s*\{/g;
+    wrapped = wrapped.replace(arrowRegex, '$1 $2 = function($3$4) { window.$2 = $2;');
+    
+    return wrapped;
 }
 
 function extractFunctionNames(js) {
