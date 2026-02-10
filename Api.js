@@ -21,6 +21,7 @@ const { google } = require('googleapis');
 const url = require('url');
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 
 // Middleware for parsing multipart/form-data (for asset uploads)
@@ -137,6 +138,15 @@ const transporter = nodemailer.createTransport({
     },
     tls: {
         rejectUnauthorized: false
+    }
+});
+
+// Verify transporter on startup
+transporter.verify(function (error, success) {
+    if (error) {
+        console.error('SMTP Transporter Error:', error);
+    } else {
+        console.log('SMTP Server is ready to take our messages');
     }
 });
 
