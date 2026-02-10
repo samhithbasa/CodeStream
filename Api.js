@@ -21,7 +21,7 @@ const { google } = require('googleapis');
 const url = require('url');
 
 const app = express();
-app.set('trust proxy', 1);
+app.set('trust proxy', true);
 const PORT = process.env.PORT || 3000;
 
 // Middleware for parsing multipart/form-data (for asset uploads)
@@ -130,8 +130,9 @@ async function startServer() {
 }
 
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
     host: 'smtp.gmail.com',
+    port: 587,
+    secure: false,
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
