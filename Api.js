@@ -74,9 +74,9 @@ app.use('/css', express.static(path.join(__dirname, "public", "css")));
 
 // Google OAuth2 client configuration
 const oauth2Client = new google.auth.OAuth2(
-    "1079090693613-lovubh9n9s7bcm1jka6ssh1grm62usk5.apps.googleusercontent.com",
-    "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",
-    "http://localhost:3000/auth/google/callback"
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_REDIRECT_URL || "http://localhost:3000/auth/google/callback"
 );
 
 // Generate Google OAuth URL (optional state = redirect path after login, e.g. /code.html)

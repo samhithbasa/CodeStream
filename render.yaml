@@ -17,5 +17,11 @@ services:
         sync: false
       - key: ADMIN_PASSWORD
         sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URL
+        placeholder: "https://your-app-name.onrender.com/auth/google/callback"
       - key: NODE_ENV
         value: production
