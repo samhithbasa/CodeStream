@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require("express");
 const { ObjectId } = require('mongodb');
 const path = require("path");
