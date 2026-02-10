@@ -21,7 +21,7 @@ const { google } = require('googleapis');
 const url = require('url');
 
 const app = express();
-app.set('trust proxy', true);
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 
 // Middleware for parsing multipart/form-data (for asset uploads)
@@ -131,8 +131,8 @@ async function startServer() {
 
 const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
+    port: 465,
+    secure: true,
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
@@ -158,13 +158,15 @@ function generateOTP() {
 const otpLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 3,
-    message: 'Too many OTP requests, please try again later'
+    message: 'Too many OTP requests, please try again later',
+    validate: { trustProxy: false }
 });
 
 const passwordResetLimiter = rateLimit({
     windowMs: 60 * 60 * 1000,
     max: 3,
-    message: 'Too many password reset requests, please try again later'
+    message: 'Too many password reset requests, please try again later',
+    validate: { trustProxy: false }
 });
 
 app.get("/", (req, res) => {
