@@ -79,6 +79,11 @@ const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_REDIRECT_URL || "http://localhost:3000/auth/google/callback"
 );
 
+console.log("OAuth Config:", {
+    redirectUrl: process.env.GOOGLE_REDIRECT_URL || "http://localhost:3000/auth/google/callback",
+    clientId: process.env.GOOGLE_CLIENT_ID ? "Set" : "Not Set"
+});
+
 // Generate Google OAuth URL (optional state = redirect path after login, e.g. /code.html)
 const getGoogleAuthURL = (state) => {
     return oauth2Client.generateAuthUrl({
@@ -282,7 +287,7 @@ app.get('/debug-oauth', (req, res) => {
     res.json({
         oauthConfigured: true,
         authUrl: authUrl,
-        redirectUri: "http://localhost:3000/auth/google/callback",
+        redirectUri: process.env.GOOGLE_REDIRECT_URL || "http://localhost:3000/auth/google/callback",
         clientId: "1079090693613-lovubh9n9s7bcm1jka6ssh1grm62usk5.apps.googleusercontent.com",
         message: "Visit /auth/google to test OAuth"
     });
