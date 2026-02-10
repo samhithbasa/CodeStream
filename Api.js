@@ -129,27 +129,50 @@ async function startServer() {
     }
 }
 
-const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    },
-    tls: {
-        rejectUnauthorized: false
+async function sendEmailBrevo(to, subject, htmlContent) {
+    const apiKey = process.env.BREVO_API_KEY;
+    if (!apiKey) {
+        throw new Error('BREVO_API_KEY is not defined in environment variables');
     }
-});
 
-// Verify transporter on startup
-transporter.verify(function (error, success) {
-    if (error) {
-        console.error('SMTP Transporter Error:', error);
-    } else {
-        console.log('SMTP Server is ready to take our messages');
-    }
-});
+    const data = JSON.stringify({
+        sender: { name: "Code Editor", email: process.env.EMAIL_USER },
+        to: [{ email: to }],
+        subject: subject,
+        htmlContent: htmlContent
+    });
+
+    const options = {
+        hostname: 'api.brevo.com',
+        port: 443,
+        path: '/v3/smtp/email',
+        method: 'POST',
+        headers: {
+            'accept': 'application/json',
+            'api-key': apiKey,
+            'content-type': 'application/json',
+            'content-length': data.length
+        }
+    };
+
+    return new Promise((resolve, reject) => {
+        const req = require('https').request(options, (res) => {
+            let body = '';
+            res.on('data', (chunk) => body += chunk);
+            res.on('end', () => {
+                if (res.statusCode >= 200 && res.statusCode < 300) {
+                    resolve(JSON.parse(body));
+                } else {
+                    reject(new Error(`Brevo API error: ${res.statusCode} ${body}`));
+                }
+            });
+        });
+
+        req.on('error', (error) => reject(error));
+        req.write(data);
+        req.end();
+    });
+}
 
 function generateOTP() {
     return crypto.randomInt(100000, 999999).toString();
@@ -159,14 +182,16 @@ const otpLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 3,
     message: 'Too many OTP requests, please try again later',
-    validate: { trustProxy: false }
+    standardHeaders: true,
+    legacyHeaders: false
 });
 
 const passwordResetLimiter = rateLimit({
     windowMs: 60 * 60 * 1000,
     max: 3,
     message: 'Too many password reset requests, please try again later',
-    validate: { trustProxy: false }
+    standardHeaders: true,
+    legacyHeaders: false
 });
 
 app.get("/", (req, res) => {
@@ -382,16 +407,11 @@ function authenticateAdmin(req, res, next) {
 
 app.get('/test-email', async (req, res) => {
     try {
-        await transporter.sendMail({
-            from: `Test <${process.env.EMAIL_USER}>`,
-            to: process.env.EMAIL_USER,
-            subject: 'Test Email',
-            text: 'This is a test email'
-        });
+        await sendEmailBrevo(process.env.EMAIL_USER, 'Test Email', 'This is a test email');
         res.send('Test email sent successfully');
     } catch (error) {
         console.error('Test email failed:', error);
-        res.status(500).send('Failed to send test email');
+        res.status(500).send('Failed to send test email: ' + error.message);
     }
 });
 
@@ -445,12 +465,7 @@ app.post('/api/contact', async (req, res) => {
         // Save to database
         await contactSubmissions.insertOne(ticket);
 
-        // Send confirmation email
-        const mailOptions = {
-            from: `CodeEditor Support <${process.env.EMAIL_USER}>`,
-            to: email,
-            subject: `Ticket Created: ${ticket.ticketId}`,
-            html: `
+        await sendEmailBrevo(email, `Ticket Created: ${ticket.ticketId}`, `
                 <h2>Thank you for contacting us!</h2>
                 <p>We've received your message and will respond within 24 hours.</p>
                 <p><strong>Ticket ID:</strong> ${ticket.ticketId}</p>
@@ -460,10 +475,7 @@ app.post('/api/contact', async (req, res) => {
                 <p>${message.replace(/\n/g, '<br>')}</p>
                 <hr>
                 <p>You can reply directly to this email to add more information.</p>
-            `
-        };
-
-        await transporter.sendMail(mailOptions);
+            `);
 
         res.json({
             success: true,
@@ -517,11 +529,7 @@ app.put('/api/admin/tickets/:id', authenticateAdmin, async (req, res) => {
 
 async function sendResolutionEmail(ticket) {
     try {
-        const mailOptions = {
-            from: `CodeEditor Support <${process.env.EMAIL_USER}>`,
-            to: ticket.email,
-            subject: `Your ticket ${ticket.ticketId} has been resolved`,
-            html: `
+        await sendEmailBrevo(ticket.email, `Your ticket ${ticket.ticketId} has been resolved`, `
                 <h2>Your Support Ticket Has Been Resolved</h2>
                 <p>Hello ${ticket.name},</p>
                 <p>We're happy to inform you that your support ticket has been resolved.</p>
@@ -548,10 +556,7 @@ async function sendResolutionEmail(ticket) {
                 </div>
                 
                 <p>Best regards,<br>The CodeEditor Team</p>
-            `
-        };
-
-        await transporter.sendMail(mailOptions);
+            `);
         console.log(`Resolution email sent to ${ticket.email}`);
     } catch (error) {
         console.error('Error sending resolution email:', error);
@@ -587,21 +592,14 @@ app.post('/send-otp', otpLimiter, async (req, res) => {
             { upsert: true }
         );
 
-        const mailOptions = {
-            from: `Code Editor <${process.env.EMAIL_USER}>`,
-            to: email,
-            subject: 'Your OTP for Registration',
-            html: `
-                <h2>Your OTP Code</h2>
-                <p>Your OTP is: <strong>${otp}</strong></p>
-                <p>It will expire in 5 minutes.</p>
-            `
-        };
-
         console.log('Attempting to send OTP email to:', email);
         console.log('Using EMAIL_USER:', process.env.EMAIL_USER ? 'Set' : 'Not Set');
 
-        await transporter.sendMail(mailOptions);
+        await sendEmailBrevo(email, 'Your OTP for Registration', `
+                <h2>Your OTP Code</h2>
+                <p>Your OTP is: <strong>${otp}</strong></p>
+                <p>It will expire in 5 minutes.</p>
+            `);
         console.log('Email sent successfully to:', email);
         res.json({ message: 'OTP sent successfully' });
     } catch (error) {
@@ -747,20 +745,13 @@ app.post('/forgot-password', passwordResetLimiter, async (req, res) => {
 
         const resetLink = `http://localhost:3000/reset-password?token=${token}`;
 
-        const mailOptions = {
-            from: `Code Editor <${process.env.EMAIL_USER}>`,
-            to: email,
-            subject: 'Password Reset Request',
-            html: `
+        await sendEmailBrevo(email, 'Password Reset Request', `
                 <h2>Password Reset</h2>
                 <p>You requested to reset your password. Click the link below to proceed:</p>
                 <a href="${resetLink}">Reset Password</a>
                 <p>This link will expire in 1 hour.</p>
                 <p>If you didn't request this, please ignore this email.</p>
-            `
-        };
-
-        await transporter.sendMail(mailOptions);
+            `);
         res.json({
             message: 'Password reset email sent',
             token
