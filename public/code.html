@@ -13,6 +13,10 @@
     <script src="/js/codemirror-5.65.18/mode/python/python.js"></script>
     <script src="/js/codemirror-5.65.18/addon/hint/show-hint.js"></script>
     <script src="/js/codemirror-5.65.18/addon/hint/anyword-hint.js"></script>
+    <link rel="stylesheet" href="/js/codemirror-5.65.18/addon/hint/show-hint.css">
+    <!-- Lint Addon -->
+    <link rel="stylesheet" href="/js/codemirror-5.65.18/addon/lint/lint.css">
+    <script src="/js/codemirror-5.65.18/addon/lint/lint.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/js-cookie@3.0.5/dist/js.cookie.min.js"></script>
     <link rel="stylesheet" href="/js/codemirror-5.65.18/theme/material-darker.css">
     <link rel="stylesheet" href="/js/codemirror-5.65.18/theme/solarized.css">
@@ -121,7 +125,84 @@
             theme: "material-darker",
             lineNumbers: true,
             autoCloseBrackets: true,
-            extraKeys: { "Ctrl-Space": "autocomplete" }
+            extraKeys: { "Ctrl-Space": "autocomplete" },
+            lint: {
+                getAnnotations: CodeMirror.asyncLint,
+                async: true
+            },
+            gutters: ["CodeMirror-lint-markers"]
+        });
+
+        // Custom Linting Logic
+        CodeMirror.asyncLint = function (content, update, options, cm) {
+            fetch('/lint', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: content, lang: selectedLanguage })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    const annotations = data.errors.map(err => ({
+                        from: CodeMirror.Pos(err.line, err.column),
+                        to: CodeMirror.Pos(err.line, err.column + 1),
+                        message: err.message,
+                        severity: err.severity || "error"
+                    }));
+                    update(cm, annotations);
+                })
+                .catch(err => {
+                    console.error("Linting error:", err);
+                    update(cm, []);
+                });
+        };
+
+        // Autocomplete on type
+        editor.on("keyup", function (cm, event) {
+            if (!cm.state.completionActive &&
+                event.keyCode >= 65 && event.keyCode <= 90 || // A-Z
+                event.keyCode == 190 || // .
+                event.keyCode == 186) { // :
+                CodeMirror.commands.autocomplete(cm, null, { completeSingle: false });
+            }
+        });
+
+        const langKeywords = {
+            'C': ["auto", "break", "case", "char", "const", "continue", "default", "do", "double", "else", "enum", "extern", "float", "for", "goto", "if", "int", "long", "register", "return", "short", "signed", "sizeof", "static", "struct", "switch", "typedef", "union", "unsigned", "void", "volatile", "while"],
+            'Cpp': ["auto", "break", "case", "char", "const", "continue", "default", "do", "double", "else", "enum", "extern", "float", "for", "goto", "if", "int", "long", "register", "return", "short", "signed", "sizeof", "static", "struct", "switch", "typedef", "union", "unsigned", "void", "volatile", "while", "class", "public", "private", "protected", "namespace", "using", "template", "typename", "virtual", "override", "std", "cout", "cin", "endl"],
+            'Python': ["False", "None", "True", "and", "as", "assert", "async", "await", "break", "class", "continue", "def", "del", "elif", "else", "except", "finally", "for", "from", "global", "if", "import", "in", "is", "lambda", "nonlocal", "not", "or", "pass", "raise", "return", "try", "while", "with", "yield", "print", "input", "range", "len", "type"],
+            'Java': ["abstract", "assert", "boolean", "break", "byte", "case", "catch", "char", "class", "const", "continue", "default", "do", "double", "else", "enum", "extends", "final", "finally", "float", "for", "goto", "if", "implements", "import", "instanceof", "int", "interface", "long", "native", "new", "package", "private", "protected", "public", "return", "short", "static", "strictfp", "super", "switch", "synchronized", "this", "throw", "throws", "transient", "try", "void", "volatile", "while", "System", "out", "println"]
+        };
+
+        CodeMirror.registerHelper("hint", "anyword", function (editor, options) {
+            const word = /[\w$]+/;
+            const cur = editor.getCursor(), curLine = editor.getLine(cur.line);
+            const end = cur.ch, start = end;
+            while (start && word.test(curLine.charAt(start - 1))) --start;
+            const curWord = start != end && curLine.slice(start, end);
+
+            const list = [];
+            const keywords = langKeywords[selectedLanguage] || [];
+
+            // Add language keywords
+            keywords.forEach(kw => {
+                if (kw.startsWith(curWord || "")) list.push(kw);
+            });
+
+            // Add words from the editor itself (existing anyword-hint behavior)
+            const re = new RegExp(word.source, "g");
+            for (let i = 0; i < editor.lineCount(); i++) {
+                const line = editor.getLine(i);
+                let m;
+                while (m = re.exec(line)) {
+                    if (i != cur.line || m[0] != curWord) {
+                        if (m[0].startsWith(curWord || "") && !list.includes(m[0])) {
+                            list.push(m[0]);
+                        }
+                    }
+                }
+            }
+
+            return { list: list, from: CodeMirror.Pos(cur.line, start), to: CodeMirror.Pos(cur.line, end) };
         });
 
         const input = document.getElementById("input-box");
@@ -179,32 +260,256 @@
             }
         });
 
-        // Check if this is a fresh login from Google OAuth
+        // In code.html, replace the existing Google OAuth handling section with this:
+
+        // Handle Google OAuth redirect with token
         document.addEventListener('DOMContentLoaded', function () {
             const urlParams = new URLSearchParams(window.location.search);
             const token = urlParams.get('token');
             const freshLogin = sessionStorage.getItem('fresh_login');
 
-            // If we have a token from Google OAuth and it's a fresh login
+            console.log('DEBUG Code Editor: Token check', {
+                tokenExists: !!token,
+                freshLogin: freshLogin,
+                url: window.location.href
+            });
+
             if (token && !freshLogin) {
-                // Store the token in cookies
+                // Store token in cookies (works on HTTP localhost too)
+                const isSecure = window.location.protocol === 'https:';
                 Cookies.set('token', token, {
                     expires: 7,
                     path: '/',
-                    secure: true,
-                    sameSite: 'strict'
+                    secure: isSecure,
+                    sameSite: 'lax'
                 });
 
-                // Mark as fresh login to prevent showing popup again
                 sessionStorage.setItem('fresh_login', 'true');
 
-                // Remove token from URL
-                window.history.replaceState({}, document.title, window.location.pathname);
+                // Clean URL
+                const cleanURL = window.location.pathname;
+                window.history.replaceState({}, document.title, cleanURL);
 
-                // Show the editor selection popup
-                showEditorSelectionPopup();
+                // Restore pending code if user had tried to save before redirect to login
+                const pending = sessionStorage.getItem('pendingCode');
+                if (pending) {
+                    try {
+                        const { code, lang, name } = JSON.parse(pending);
+                        if (editor && editor.setValue) editor.setValue(code || '');
+                        if (lang && languageModes) {
+                            const key = ({ 'Cpp': 'c++', 'C': 'c', 'Java': 'java', 'Python': 'python' })[lang] || 'c++';
+                            if (languageModes[key]) {
+                                selectedLanguage = languageModes[key].lang;
+                                editor.setOption('mode', languageModes[key].mode);
+                                document.querySelectorAll('.icons img').forEach(img => img.classList.remove('active-language'));
+                                const icon = document.getElementById(key);
+                                if (icon) icon.classList.add('active-language');
+                            }
+                        }
+                        sessionStorage.removeItem('pendingCode');
+                        if (typeof showNotification === 'function') showNotification('Logged in! You can save your code now.');
+                        if (typeof showSavePopup === 'function') showSavePopup();
+                    } catch (e) { /* ignore */ }
+                }
+                verifyAuthStatus();
+            } else {
+                // Regular auth check
+                verifyAuthStatus();
             }
         });
+
+        // Add this function to code.html script section
+        function showEditorSelectionPopup() {
+            console.log('DEBUG: showEditorSelectionPopup called from code editor');
+
+            // Create popup overlay
+            const popupOverlay = document.createElement('div');
+            popupOverlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+        backdrop-filter: blur(10px);
+    `;
+
+            const popupContent = document.createElement('div');
+            popupContent.style.cssText = `
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 40px;
+        border-radius: 20px;
+        text-align: center;
+        color: white;
+        max-width: 600px;
+        width: 90%;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    `;
+
+            popupContent.innerHTML = `
+        <h2 style="margin-bottom: 10px; font-size: 2rem;">🎉 Welcome to Code Editor!</h2>
+        <p style="margin-bottom: 15px; opacity: 0.9;">Would you like to switch to Frontend Playground?</p>
+        
+        <div style="background: rgba(255, 255, 255, 0.15); padding: 15px; border-radius: 10px; margin: 20px 0; text-align: left; border-left: 4px solid #ffd700;">
+            <h4 style="margin: 0 0 10px 0; color: #ffd700;">📝 Important Notes:</h4>
+            <div style="font-size: 0.9rem; line-height: 1.5;">
+                <div style="margin-bottom: 10px;">
+                    <strong>🔧 For Frontend Playground:</strong>
+                    <ul style="margin: 5px 0 5px 20px; padding: 0;">
+                        <li>Write JavaScript functions globally</li>
+                        <li>Build complete web projects</li>
+                        <li>Live preview and deployment</li>
+                    </ul>
+                </div>
+                <div>
+                    <strong>☕ For Code Editor (Java/C++/Python):</strong>
+                    <ul style="margin: 5px 0 0 20px; padding: 0;">
+                        <li>Write, compile and run code</li>
+                        <li>Multiple programming languages</li>
+                        <li>Integrated terminal</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div style="display: flex; gap: 15px; justify-content: center; margin-top: 20px;">
+            <button id="stay-here" style="
+                background: rgba(255, 255, 255, 0.2); 
+                color: white; 
+                border: 1px solid rgba(255, 255, 255, 0.3); 
+                padding: 12px 30px; 
+                border-radius: 25px; 
+                cursor: pointer; 
+                font-size: 1rem;
+                transition: all 0.3s ease;
+                min-width: 150px;
+            ">Stay Here</button>
+            <button id="go-to-frontend" style="
+                background: rgba(255, 255, 255, 0.9); 
+                color: #667eea; 
+                border: none; 
+                padding: 12px 30px; 
+                border-radius: 25px; 
+                cursor: pointer; 
+                font-size: 1rem; 
+                font-weight: bold;
+                transition: all 0.3s ease;
+                min-width: 150px;
+            ">Go to Frontend Playground</button>
+        </div>
+        
+        <p style="margin-top: 20px; font-size: 0.8rem; opacity: 0.7;">
+            <strong>Tip:</strong> You can switch between editors anytime using the navigation menu.
+        </p>
+    `;
+
+            popupOverlay.appendChild(popupContent);
+            document.body.appendChild(popupOverlay);
+
+            // Add hover effects
+            const stayBtn = document.getElementById('stay-here');
+            const goBtn = document.getElementById('go-to-frontend');
+
+            stayBtn.addEventListener('mouseenter', () => {
+                stayBtn.style.background = 'rgba(255, 255, 255, 0.3)';
+                stayBtn.style.transform = 'translateY(-2px)';
+            });
+
+            stayBtn.addEventListener('mouseleave', () => {
+                stayBtn.style.background = 'rgba(255, 255, 255, 0.2)';
+                stayBtn.style.transform = 'translateY(0)';
+            });
+
+            goBtn.addEventListener('mouseenter', () => {
+                goBtn.style.background = 'rgba(255, 255, 255, 1)';
+                goBtn.style.transform = 'translateY(-2px)';
+                goBtn.style.boxShadow = '0 5px 15px rgba(0, 0, 0, 0.2)';
+            });
+
+            goBtn.addEventListener('mouseleave', () => {
+                goBtn.style.background = 'rgba(255, 255, 255, 0.9)';
+                goBtn.style.transform = 'translateY(0)';
+                goBtn.style.boxShadow = 'none';
+            });
+
+            // Add event listeners
+            stayBtn.addEventListener('click', function () {
+                console.log('DEBUG: User chose to stay on Code Editor');
+                document.body.removeChild(popupOverlay);
+
+                // Show confirmation
+                showNotification('✓ Staying on Code Editor');
+            });
+
+            goBtn.addEventListener('click', function () {
+                console.log('DEBUG: User chose to go to Frontend Playground');
+
+                // Add loading effect
+                goBtn.innerHTML = '⏳ Redirecting...';
+                goBtn.disabled = true;
+                goBtn.style.opacity = '0.7';
+
+                setTimeout(() => {
+                    window.location.href = '/frontend-editor.html';
+                }, 500);
+            });
+
+            // Close on overlay click
+            popupOverlay.addEventListener('click', function (e) {
+                if (e.target === popupOverlay) {
+                    document.body.removeChild(popupOverlay);
+                }
+            });
+
+            // Add CSS animation
+            const style = document.createElement('style');
+            style.textContent = `
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        @keyframes slideOutRight {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+    `;
+            document.head.appendChild(style);
+        }
+
+        // Add notification function
+        function showNotification(message) {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #10b981;
+        color: white;
+        padding: 15px 25px;
+        border-radius: 10px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        animation: slideInRight 0.3s ease;
+        z-index: 10001;
+    `;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.style.animation = 'slideOutRight 0.3s ease';
+                setTimeout(() => notification.remove(), 300);
+            }, 2000);
+        }
 
         document.querySelectorAll('.icons img').forEach(icon => {
             icon.addEventListener('click', () => {
@@ -353,8 +658,7 @@
             // Check authentication first
             const token = Cookies.get('token');
             if (!token) {
-                const currentUrl = encodeURIComponent(window.location.href);
-                window.location.href = `/login?redirect=${currentUrl}`;
+                window.location.href = `/login.html?redirect=${encodeURIComponent(window.location.pathname || '/code.html')}&source=code-editor`;
                 return;
             }
 
@@ -380,8 +684,7 @@
             // Check authentication first
             const token = Cookies.get('token');
             if (!token) {
-                const currentUrl = encodeURIComponent(window.location.href);
-                window.location.href = `/login?redirect=${currentUrl}`;
+                window.location.href = `/login.html?redirect=${encodeURIComponent(window.location.pathname || '/code.html')}&source=code-editor`;
                 return;
             }
 
@@ -401,8 +704,7 @@
             // Check authentication first
             const token = Cookies.get('token');
             if (!token) {
-                const currentUrl = encodeURIComponent(window.location.href);
-                window.location.href = `/login?redirect=${currentUrl}`;
+                window.location.href = `/login.html?redirect=${encodeURIComponent(window.location.pathname || '/code.html')}&source=code-editor`;
                 return;
             }
 
@@ -505,10 +807,23 @@
 
         async function saveCurrentCode(name) {
             const token = Cookies.get('token');
+
             if (!token) {
+                console.log('DEBUG: No token found, redirecting to login');
+
+                // Store the code content temporarily before redirect
+                const pendingCode = {
+                    code: editor.getValue(),
+                    lang: selectedLanguage,
+                    name: name
+                };
+
+                // Store in sessionStorage
+                sessionStorage.setItem('pendingCode', JSON.stringify(pendingCode));
+
                 // Redirect to login with return URL
-                const currentUrl = encodeURIComponent(window.location.href);
-                window.location.href = `/login?redirect=${currentUrl}`;
+                const currentUrl = encodeURIComponent('/code.html');
+                window.location.href = `/login.html?redirect=${currentUrl}&source=code-editor`;
                 return;
             }
 
@@ -792,8 +1107,7 @@
             const token = Cookies.get('token');
 
             if (!token) {
-                const currentUrl = encodeURIComponent(window.location.href);
-                window.location.href = `/login?redirect=${currentUrl}`;
+                window.location.href = `/login.html?redirect=${encodeURIComponent(window.location.pathname || '/code.html')}&source=code-editor`;
                 return;
             }
 
@@ -824,8 +1138,7 @@
 
             const token = Cookies.get('token');
             if (!token) {
-                const currentUrl = encodeURIComponent(window.location.href);
-                window.location.href = `/login?redirect=${currentUrl}`;
+                window.location.href = `/login.html?redirect=${encodeURIComponent(window.location.pathname || '/code.html')}&source=code-editor`;
                 return;
             }
 

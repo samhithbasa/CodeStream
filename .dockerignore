@@ -1,0 +1,15 @@
+node_modules
+npm-debug.log
+.env
+.git
+.vscode
+saved_codes
+shared_codes
+temp
+compilex_temp
+frontend_projects
+frontend_assets
+Dockerfile
+render.yaml
+*.md
+.gemini

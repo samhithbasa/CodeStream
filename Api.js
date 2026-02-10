@@ -22,6 +22,10 @@ const url = require('url');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Middleware for parsing multipart/form-data (for asset uploads)
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
 // Initialize database connection first
 let db;
 let contactSubmissions;
@@ -47,6 +51,11 @@ if (!fs.existsSync(FRONTEND_STORAGE_DIR)) {
     fs.mkdirSync(FRONTEND_STORAGE_DIR, { recursive: true });
 }
 
+const ASSETS_STORAGE_DIR = path.join(__dirname, "frontend_assets");
+if (!fs.existsSync(ASSETS_STORAGE_DIR)) {
+    fs.mkdirSync(ASSETS_STORAGE_DIR, { recursive: true });
+}
+
 const frontendProjects = new Map();
 
 const options = {
@@ -56,8 +65,8 @@ const options = {
 compiler.init(options);
 
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.static(path.join(__dirname, "public")));
 app.use('/images', express.static(path.join(__dirname, "public", "images")));
 app.use('/js', express.static(path.join(__dirname, "public", "js")));
@@ -70,15 +79,16 @@ const oauth2Client = new google.auth.OAuth2(
     "http://localhost:3000/auth/google/callback"
 );
 
-// Generate Google OAuth URL
-const getGoogleAuthURL = () => {
+// Generate Google OAuth URL (optional state = redirect path after login, e.g. /code.html)
+const getGoogleAuthURL = (state) => {
     return oauth2Client.generateAuthUrl({
         access_type: 'offline',
         prompt: 'consent',
         scope: [
             'https://www.googleapis.com/auth/userinfo.profile',
             'https://www.googleapis.com/auth/userinfo.email'
-        ]
+        ],
+        state: state || ''
     });
 };
 
@@ -197,7 +207,8 @@ app.get('/pricing', (req, res) => {
 
 // Google OAuth routes
 app.get('/auth/google', (req, res) => {
-    const authUrl = getGoogleAuthURL();
+    const redirectPath = req.query.redirect || '';
+    const authUrl = getGoogleAuthURL(redirectPath);
     res.redirect(authUrl);
 });
 
@@ -253,8 +264,11 @@ app.get('/auth/google/callback', async (req, res) => {
             { expiresIn: '7d' }
         );
 
-        // Redirect to editor with token
-        res.redirect(`/frontend-editor?token=${token}`);
+        // Redirect to requested path or login (to show editor choice popup), with token in URL (page will set cookie)
+        const statePath = req.query.state && decodeURIComponent(String(req.query.state));
+        const redirectTo = statePath || '/login.html';
+        const sep = redirectTo.includes('?') ? '&' : '?';
+        res.redirect(`${redirectTo}${sep}token=${encodeURIComponent(token)}`);
 
     } catch (error) {
         console.error('Google OAuth callback error:', error);
@@ -966,6 +980,95 @@ app.post("/run-interactive", (req, res) => {
     }
 });
 
+app.post("/lint", async (req, res) => {
+    const { code, lang } = req.body;
+    if (!code || !lang) {
+        return res.status(400).json({ error: "Code and language are required!" });
+    }
+
+    const id = uuidv4();
+    let tempFile;
+    let command;
+
+    if (lang === "Python") {
+        tempFile = path.join(tempDir, `${id}.py`);
+        fs.writeFileSync(tempFile, code);
+        command = `python -m py_compile "${tempFile}"`;
+    } else if (lang === "Cpp" || lang === "C") {
+        tempFile = path.join(tempDir, `${id}.cpp`);
+        fs.writeFileSync(tempFile, code);
+        command = `g++ -fsyntax-only "${tempFile}"`;
+    } else if (lang === "Java") {
+        const classMatch = code.match(/public\s+class\s+([a-zA-Z0-9_$]+)/);
+        const className = classMatch ? classMatch[1] : "TempClass";
+        tempFile = path.join(tempDir, `${className}.java`);
+        fs.writeFileSync(tempFile, code);
+        command = `javac -Xlint "${tempFile}"`;
+    } else {
+        return res.status(400).json({ error: "Unsupported language for linting!" });
+    }
+
+    const { exec } = require("child_process");
+    exec(command, (error, stdout, stderr) => {
+        // Clean up temp file
+        try {
+            if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
+            if (lang === "Java") {
+                const classFile = tempFile.replace(".java", ".class");
+                if (fs.existsSync(classFile)) fs.unlinkSync(classFile);
+            }
+        } catch (e) {
+            console.error("Error cleaning up lint temp file:", e);
+        }
+
+        if (!error && !stderr) {
+            return res.json({ errors: [] });
+        }
+
+        const output = stderr || stdout;
+        const errors = parseCompilerErrors(output, lang, tempFile);
+        res.json({ errors });
+    });
+});
+
+function parseCompilerErrors(output, lang, fileName) {
+    const errors = [];
+    const lines = output.split("\n");
+
+    if (lang === "Python") {
+        let currentError = null;
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const lineMatch = line.match(/File ".*", line (\d+)/);
+            if (lineMatch) {
+                currentError = {
+                    line: parseInt(lineMatch[1]) - 1,
+                    column: 0,
+                    message: ""
+                };
+            } else if (currentError && line.includes("SyntaxError:")) {
+                currentError.message = line.trim();
+                errors.push(currentError);
+                currentError = null;
+            }
+        }
+    } else if (lang === "Cpp" || lang === "C" || lang === "Java") {
+        lines.forEach(line => {
+            const match = line.match(/([^:]+):(\d+):(?:(\d+):)?\s+(error|warning|info):\s+(.*)/);
+            if (match) {
+                errors.push({
+                    line: parseInt(match[2]) - 1,
+                    column: match[3] ? parseInt(match[3]) - 1 : 0,
+                    severity: match[4] === "error" ? "error" : "warning",
+                    message: match[5]
+                });
+            }
+        });
+    }
+
+    return errors;
+}
+
 app.post("/save-code", authenticateToken, (req, res) => {
     const { code, lang, name } = req.body;
     if (!code || !lang || !name) {
@@ -1082,8 +1185,9 @@ app.post('/api/frontend/save', authenticateToken, async (req, res) => {
             updatedAt: new Date(),
             deploymentHTML: deploymentHTML || generateDeployedHTML({
                 name: name || 'Untitled Project',
-                files: files || {}
-            })
+                files: files || {},
+                assets: assets || []
+            }, req)
         };
 
         // Save to file system
@@ -1093,7 +1197,8 @@ app.post('/api/frontend/save', authenticateToken, async (req, res) => {
         res.json({
             success: true,
             projectId,
-            shareUrl: `http://${req.headers.host}/frontend/${projectId}`,
+            // Trailing slash ensures relative links stay within this project's namespace
+            shareUrl: `http://${req.headers.host}/frontend/${projectId}/`,
             message: 'Project saved successfully'
         });
     } catch (error) {
@@ -1203,7 +1308,23 @@ app.get('/api/frontend/project/:id', async (req, res) => {
     }
 });
 
-function generateDeployedHTML(projectData) {
+function replaceAssetPaths(content, assets, host) {
+    if (!content || !assets || assets.length === 0) return content;
+    let processed = content;
+    const sortedAssets = [...assets].sort((a, b) => (b.filename || '').length - (a.filename || '').length);
+    sortedAssets.forEach(asset => {
+        if (!asset.filename) return;
+        const fileName = asset.filename;
+        const assetUrl = asset.url.startsWith('http') ? asset.url : `http://${host}${asset.url}`;
+        const escapedName = fileName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        processed = processed.replace(new RegExp(`(src|href|action)\\s*=\\s*["']${escapedName}["']`, 'gi'), `$1="${assetUrl}"`);
+        processed = processed.replace(new RegExp(`url\\s*\\(\\s*["']?${escapedName}["']?\\s*\\)`, 'gi'), `url("${assetUrl}")`);
+        processed = processed.replace(new RegExp(`@import\\s+["']${escapedName}["']`, 'gi'), `@import "${assetUrl}"`);
+    });
+    return processed;
+}
+
+function generateDeployedHTML(projectData, req = null) {
     // If project has deploymentHTML, use it
     if (projectData.deploymentHTML) {
         console.log('[DEBUG] Using pre-generated deployment HTML');
@@ -1212,12 +1333,44 @@ function generateDeployedHTML(projectData) {
 
     console.log('[DEBUG] Generating universal deployment HTML');
 
-    const { files, name } = projectData;
+    const { files, name, assets } = projectData;
+    const host = req ? req.headers.host : 'localhost:3000';
 
-    // Get the content from files
-    const htmlContent = files?.html?.['index.html'] || '<h1>Project</h1>';
-    const cssContent = files?.css?.['style.css'] || '';
-    const jsContent = files?.js?.['script.js'] || '';
+    const safeFiles = files || { html: {}, css: {}, js: {} };
+    const htmlFiles = safeFiles.html || {};
+    const cssFiles = safeFiles.css || {};
+    const jsFiles = safeFiles.js || {};
+
+    // Choose entry HTML file: explicit index.html, otherwise first available
+    let entryHtmlName = null;
+    if (htmlFiles['index.html']) {
+        entryHtmlName = 'index.html';
+    } else {
+        const htmlNames = Object.keys(htmlFiles);
+        if (htmlNames.length > 0) {
+            entryHtmlName = htmlNames[0];
+        }
+    }
+
+    const htmlContent = entryHtmlName ? replaceAssetPaths(htmlFiles[entryHtmlName] || '', assets, host) : '<h1>Project</h1>';
+
+    const cssContent = replaceAssetPaths(Object.entries(cssFiles).map(([name, content]) =>
+        `/* ${name} */\n${content || ''}`
+    ).join('\n\n'), assets, host);
+
+    const jsContent = Object.entries(jsFiles).map(([name, content]) =>
+        `// ${name}\n${content || ''}`
+    ).join('\n\n');
+
+    // Generate asset references (for fonts, etc.)
+    const assetLinks = (assets || []).map(asset => {
+        if (/\.(woff|woff2|ttf|otf)$/i.test(asset.filename)) {
+            const baseUrl = req ? `http://${req.headers.host}` : '';
+            const assetUrl = asset.url.startsWith('http') ? asset.url : `${baseUrl}${asset.url}`;
+            return `<link rel="preload" href="${assetUrl}" as="font" type="${asset.mimetype || 'font/woff2'}" crossorigin>`;
+        }
+        return '';
+    }).filter(link => link).join('\n    ');
 
     // Extract function names from JavaScript
     const functionNames = extractFunctionNames(jsContent);
@@ -1228,6 +1381,7 @@ function generateDeployedHTML(projectData) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${name || 'My Project'}</title>
+    ${assetLinks ? assetLinks : ''}
     <style>
         ${cssContent}
     </style>
@@ -1338,10 +1492,11 @@ app.get('/frontend-assets/:projectId/:filename', (req, res) => {
     }
 });
 
-// Handle requests for individual project files
+// Handle requests for individual project files AND assets (images, fonts)
 app.get('/frontend/:projectId/:filename', (req, res) => {
     try {
         const { projectId, filename } = req.params;
+        const decodedFilename = decodeURIComponent(filename);
 
         // Safety check
         if (projectId.endsWith('.js') || projectId.endsWith('.css') || projectId.endsWith('.html')) {
@@ -1356,16 +1511,15 @@ app.get('/frontend/:projectId/:filename', (req, res) => {
 
         const projectData = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
 
-        // Check if the requested file exists in the project
-        const fileExt = path.extname(filename).toLowerCase();
+        // Check if the requested file exists in the project (HTML, CSS, JS)
+        const fileExt = path.extname(decodedFilename).toLowerCase();
         const fileType = fileExt === '.html' ? 'html' :
             fileExt === '.css' ? 'css' :
                 fileExt === '.js' ? 'js' : null;
 
         if (fileType && projectData.files && projectData.files[fileType]) {
-            const fileContent = projectData.files[fileType][filename];
+            const fileContent = projectData.files[fileType][decodedFilename];
             if (fileContent) {
-                // Set appropriate content type
                 const contentType = {
                     '.html': 'text/html',
                     '.css': 'text/css',
@@ -1377,11 +1531,197 @@ app.get('/frontend/:projectId/:filename', (req, res) => {
             }
         }
 
+        // Check if it's an asset (image, font, etc.) - serve from project's uploaded assets
+        const assets = projectData.assets || [];
+        const asset = assets.find(a =>
+            a.filename === decodedFilename ||
+            a.filename === filename ||
+            decodeURIComponent(a.filename) === decodedFilename
+        );
+
+        if (asset && asset.id) {
+            const assetFiles = fs.existsSync(ASSETS_STORAGE_DIR)
+                ? fs.readdirSync(ASSETS_STORAGE_DIR)
+                : [];
+            const assetFile = assetFiles.find(f => f.startsWith(asset.id));
+
+            if (assetFile) {
+                const filePath = path.join(ASSETS_STORAGE_DIR, assetFile);
+                const ext = path.extname(assetFile).toLowerCase();
+                const contentTypeMap = {
+                    '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+                    '.gif': 'image/gif', '.svg': 'image/svg+xml', '.webp': 'image/webp',
+                    '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.otf': 'font/otf'
+                };
+                res.setHeader('Content-Type', contentTypeMap[ext] || 'application/octet-stream');
+                return res.sendFile(path.resolve(filePath));
+            }
+        }
+
         res.status(404).send('File not found in project');
 
     } catch (error) {
         console.error('Error serving project file:', error);
         res.status(500).send('Error loading file');
+    }
+});
+
+// Asset upload endpoint - using busboy for multipart/form-data parsing
+app.post('/api/frontend/upload-assets', authenticateToken, (req, res) => {
+    try {
+        let busboy;
+        try {
+            busboy = require('busboy');
+        } catch (e) {
+            return res.status(500).json({
+                error: 'busboy package required. Install with: npm install busboy'
+            });
+        }
+
+        const uploadedAssets = [];
+        const bb = busboy({ headers: req.headers, limits: { fileSize: 10 * 1024 * 1024 } });
+        let fileCount = 0;
+        const maxFiles = 10;
+        let finished = false;
+
+        bb.on('file', (name, file, info) => {
+            if (fileCount >= maxFiles) {
+                file.resume();
+                return;
+            }
+
+            const { filename, encoding, mimeType } = info;
+            const assetId = uuidv4();
+            const fileExt = path.extname(filename);
+            const newFileName = `${assetId}${fileExt}`;
+            const newFilePath = path.join(ASSETS_STORAGE_DIR, newFileName);
+            const writeStream = fs.createWriteStream(newFilePath);
+            let fileSize = 0;
+
+            file.on('data', (data) => {
+                fileSize += data.length;
+                if (fileSize > 10 * 1024 * 1024) {
+                    writeStream.destroy();
+                    try {
+                        if (fs.existsSync(newFilePath)) {
+                            fs.unlinkSync(newFilePath);
+                        }
+                    } catch (e) { }
+                    return;
+                }
+                writeStream.write(data);
+            });
+
+            file.on('end', () => {
+                writeStream.end();
+                fileCount++;
+                uploadedAssets.push({
+                    id: assetId,
+                    filename: filename,
+                    size: fileSize,
+                    mimetype: mimeType,
+                    url: `/api/frontend/asset/${assetId}`,
+                    uploadedAt: new Date()
+                });
+
+                // Send response when all files are processed
+                if (finished && uploadedAssets.length > 0 && !res.headersSent) {
+                    res.json({ success: true, assets: uploadedAssets });
+                }
+            });
+
+            file.on('error', (err) => {
+                console.error('File stream error:', err);
+                writeStream.destroy();
+                try {
+                    if (fs.existsSync(newFilePath)) {
+                        fs.unlinkSync(newFilePath);
+                    }
+                } catch (e) { }
+            });
+        });
+
+        bb.on('finish', () => {
+            finished = true;
+            if (uploadedAssets.length === 0 && !res.headersSent) {
+                return res.status(400).json({ error: 'No files uploaded' });
+            }
+            if (uploadedAssets.length > 0 && !res.headersSent) {
+                res.json({ success: true, assets: uploadedAssets });
+            }
+        });
+
+        bb.on('error', (err) => {
+            console.error('Busboy error:', err);
+            if (!res.headersSent) {
+                res.status(500).json({ error: 'Error processing upload: ' + err.message });
+            }
+        });
+
+        req.pipe(bb);
+    } catch (error) {
+        console.error('Error uploading assets:', error);
+        if (!res.headersSent) {
+            res.status(500).json({ error: 'Failed to upload assets: ' + error.message });
+        }
+    }
+});
+
+// Serve asset files
+app.get('/api/frontend/asset/:assetId', (req, res) => {
+    try {
+        const assetId = req.params.assetId;
+        const files = fs.readdirSync(ASSETS_STORAGE_DIR);
+        const assetFile = files.find(f => f.startsWith(assetId));
+
+        if (!assetFile) {
+            return res.status(404).send('Asset not found');
+        }
+
+        const filePath = path.join(ASSETS_STORAGE_DIR, assetFile);
+        const ext = path.extname(assetFile).toLowerCase();
+
+        // Set appropriate content type
+        const contentTypeMap = {
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.png': 'image/png',
+            '.gif': 'image/gif',
+            '.svg': 'image/svg+xml',
+            '.webp': 'image/webp',
+            '.woff': 'font/woff',
+            '.woff2': 'font/woff2',
+            '.ttf': 'font/ttf',
+            '.otf': 'font/otf'
+        };
+
+        const contentType = contentTypeMap[ext] || 'application/octet-stream';
+        res.setHeader('Content-Type', contentType);
+        res.sendFile(path.resolve(filePath));
+    } catch (error) {
+        console.error('Error serving asset:', error);
+        res.status(500).send('Error loading asset');
+    }
+});
+
+// Delete asset endpoint
+app.delete('/api/frontend/asset/:assetId', authenticateToken, async (req, res) => {
+    try {
+        const assetId = req.params.assetId;
+        const files = fs.readdirSync(ASSETS_STORAGE_DIR);
+        const assetFile = files.find(f => f.startsWith(assetId));
+
+        if (!assetFile) {
+            return res.status(404).json({ error: 'Asset not found' });
+        }
+
+        const filePath = path.join(ASSETS_STORAGE_DIR, assetFile);
+        fs.unlinkSync(filePath);
+
+        res.json({ success: true, message: 'Asset deleted' });
+    } catch (error) {
+        console.error('Error deleting asset:', error);
+        res.status(500).json({ error: 'Failed to delete asset' });
     }
 });
 
@@ -1430,14 +1770,14 @@ app.get('/frontend/:id', (req, res) => {
 
         const projectData = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
 
-        // Use deploymentHTML if it exists
-        if (projectData.deploymentHTML) {
+        // Use deploymentHTML if it exists, but regenerate to include latest assets
+        if (projectData.deploymentHTML && (!projectData.assets || projectData.assets.length === 0)) {
             res.setHeader('Content-Type', 'text/html');
             return res.send(projectData.deploymentHTML);
         }
 
-        // Fallback to simple generation
-        const simpleHTML = generateDeployedHTML(projectData);
+        // Generate HTML with assets included
+        const simpleHTML = generateDeployedHTML(projectData, req);
         res.setHeader('Content-Type', 'text/html');
         res.send(simpleHTML);
 
@@ -1494,7 +1834,7 @@ app.get('/api/frontend/projects', async (req, res) => {
                         name: projectData.name,
                         createdAt: projectData.createdAt,
                         updatedAt: projectData.updatedAt,
-                        shareUrl: `http://localhost:3000/frontend/${projectData.id}`,
+                        shareUrl: `http://${req.headers.host}/frontend/${projectData.id}/`,
                         fileCount: Object.keys(projectData.files || {}).reduce((acc, key) =>
                             acc + Object.keys(projectData.files[key] || {}).length, 0),
                         assetCount: (projectData.assets || []).length,
@@ -1804,15 +2144,29 @@ wss.on('connection', (ws) => {
 
                 case 'input':
                     console.log('⌨️ [DEBUG] Input received:', JSON.stringify(message.data));
+                    console.log('🔍 [DEBUG] Process state:', {
+                        exists: !!process,
+                        hasStdin: !!(process && process.stdin),
+                        stdinDestroyed: process ? process.stdin.destroyed : 'N/A',
+                        pid: process ? process.pid : 'N/A'
+                    });
                     if (process && process.stdin && !process.stdin.destroyed) {
                         let inputData = message.data;
                         if (!inputData.endsWith('\n')) {
                             inputData += '\n';
                         }
-                        process.stdin.write(inputData);
-                        console.log('✅ [DEBUG] Input sent to process');
+                        try {
+                            const written = process.stdin.write(inputData);
+                            console.log('✅ [DEBUG] Input sent to process, written:', written);
+                        } catch (err) {
+                            console.error('💥 [DEBUG] Error writing to stdin:', err);
+                        }
                     } else {
                         console.log('❌ [DEBUG] Process stdin not available or destroyed');
+                        ws.send(JSON.stringify({
+                            type: 'output',
+                            data: '\x1b[33m⚠ Warning: Input not sent - process may have ended\x1b[0m\r\n'
+                        }));
                     }
                     break;
 
@@ -2015,6 +2369,7 @@ wss.on('connection', (ws) => {
                 const executable = path.join(tempDir, `code-${timestamp}.exe`);
                 tempFiles.push(executable);
 
+                // Use full path if Node still can't find gcc by name
                 command = 'gcc';
                 args = [filename, '-o', executable];
                 console.log('⚙️ [DEBUG] C compile command:', command, args);
@@ -2042,8 +2397,10 @@ wss.on('connection', (ws) => {
                 tempFiles.push(filename);
                 console.log('📝 [DEBUG] Python file created:', filename);
 
-                command = 'python3';
-                args = [filename];
+                // Use standard command names for cross-platform compatibility
+                command = os.platform() === 'win32' ? 'python' : 'python3';
+                // Use -u flag for unbuffered output (immediate output display)
+                args = ['-u', filename];
                 console.log('⚙️ [DEBUG] Python execute command:', command, args);
                 break;
 
@@ -2164,12 +2521,70 @@ wss.on('connection', (ws) => {
         function runProcess(cmd, args) {
             console.log('🎯 [DEBUG] runProcess called with:', { cmd, args });
 
-            process = spawn(cmd, args, {
+            // For Windows executables (compiled C/C++), use shell: true to ensure proper console handling
+            // But NOT for Python/Java interpreters - they handle I/O fine without shell
+            const isCompiledExe = os.platform() === 'win32' &&
+                cmd.endsWith('.exe') &&
+                !cmd.includes('python') &&
+                !cmd.includes('java');
+
+            let spawnCmd = cmd;
+            let spawnArgs = args;
+            const spawnOptions = {
                 cwd: tempDir,
                 stdio: ['pipe', 'pipe', 'pipe']
-            });
+            };
+
+            // On Windows, use shell ONLY for compiled executables (C/C++ .exe files)
+            // Python and Java interpreters work fine without shell mode
+            if (isCompiledExe) {
+                spawnOptions.shell = true;
+                // Escape the command path and combine with args
+                const escapedCmd = `"${cmd.replace(/"/g, '\\"')}"`;
+                spawnCmd = escapedCmd + (args.length > 0 ? ' ' + args.map(a => `"${a.replace(/"/g, '\\"')}"`).join(' ') : '');
+                spawnArgs = [];
+                console.log('🔧 [DEBUG] Using shell mode for compiled executable, combined command:', spawnCmd);
+            } else {
+                console.log('🔧 [DEBUG] Using direct spawn (no shell) for interpreter');
+            }
+
+            process = spawn(spawnCmd, spawnArgs, spawnOptions);
 
             console.log('✅ [DEBUG] Process spawned successfully, PID:', process.pid);
+            console.log('🔍 [DEBUG] Process streams:', {
+                hasStdout: !!process.stdout,
+                hasStderr: !!process.stderr,
+                hasStdin: !!process.stdin,
+                stdoutReadable: process.stdout ? process.stdout.readable : false,
+                stderrReadable: process.stderr ? process.stderr.readable : false
+            });
+
+            // IMPORTANT: Send program_running immediately so frontend can accept input
+            // This is critical for programs that wait for input before producing output (C/C++ scanf/cin)
+            ws.send(JSON.stringify({
+                type: 'program_running'
+            }));
+            console.log('📢 [DEBUG] Sent program_running signal - frontend can now accept input');
+
+            // Set stdout to unbuffered mode for immediate output
+            if (process.stdout) {
+                process.stdout.setEncoding('utf8');
+                // Ensure the stream is readable
+                process.stdout.setDefaultEncoding('utf8');
+            }
+            if (process.stderr) {
+                process.stderr.setEncoding('utf8');
+                process.stderr.setDefaultEncoding('utf8');
+            }
+
+            // Add error handlers for streams
+            process.stdout.on('error', (err) => {
+                console.error('💥 [DEBUG] STDOUT stream error:', err);
+            });
+
+            process.stderr.on('error', (err) => {
+                console.error('💥 [DEBUG] STDERR stream error:', err);
+            });
 
             process.stdout.on('data', (data) => {
                 const output = data.toString();
@@ -2178,6 +2593,7 @@ wss.on('connection', (ws) => {
                     type: 'output',
                     data: output
                 }));
+                // Also send program_running on each output to keep frontend ready for more input
                 ws.send(JSON.stringify({
                     type: 'program_running'
                 }));

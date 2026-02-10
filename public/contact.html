@@ -83,7 +83,9 @@
 
                 <div class="form-group">
                     <label for="email">Email Address</label>
-                    <input type="email" id="email" name="email" placeholder="john@example.com" required />
+                    <input type="email" id="email" name="email" placeholder="john@gmail.com" required
+                        pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
+                        title="Enter a valid email (e.g. name@gmail.com)" />
                     <span class="error-message" id="email-error"></span>
                 </div>
 
@@ -212,8 +214,14 @@
                 if (input.validity.valueMissing) {
                     return 'This field is required';
                 }
+                if (input.id === 'email' && (input.validity.typeMismatch || input.validity.patternMismatch)) {
+                    return 'Please enter a valid email (e.g. name@gmail.com)';
+                }
                 if (input.validity.typeMismatch) {
                     return 'Please enter a valid email address';
+                }
+                if (input.validity.patternMismatch) {
+                    return 'Please match the requested format';
                 }
                 if (input.validity.tooShort) {
                     return `Minimum ${input.minLength} characters required`;

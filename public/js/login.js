@@ -18,11 +18,12 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
         const data = await response.json();
         
         if (response.ok) {
+            const isSecure = window.location.protocol === 'https:';
             Cookies.set('token', data.token, { 
                 expires: 7, 
                 path: '/',
-                secure: true,
-                sameSite: 'strict'
+                secure: isSecure,
+                sameSite: 'lax'
             });
             
             messageDiv.textContent = data.message;
@@ -65,11 +66,12 @@ function handleGoogleAuth(response) {
     verifyGoogleToken(response.credential)
         .then(data => {
             if (data.token) {
+                const isSecure = window.location.protocol === 'https:';
                 Cookies.set('token', data.token, { 
                     expires: 7, 
                     path: '/',
-                    secure: true,
-                    sameSite: 'strict'
+                    secure: isSecure,
+                    sameSite: 'lax'
                 });
                 
                 messageDiv.textContent = 'Google login successful!';
@@ -263,19 +265,24 @@ function handleGoogleAuth(response) {
     verifyGoogleToken(response.credential)
         .then(data => {
             if (data.token) {
+                const isSecure = window.location.protocol === 'https:';
                 Cookies.set('token', data.token, { 
                     expires: 7, 
                     path: '/',
-                    secure: true,
-                    sameSite: 'strict'
+                    secure: isSecure,
+                    sameSite: 'lax'
                 });
                 
                 messageDiv.textContent = 'Google login successful!';
                 messageDiv.classList.add('success');
                 
-                setTimeout(() => {
-                    showEditorSelectionPopup();
-                }, 1000);
+                const urlParams = new URLSearchParams(window.location.search);
+                const redirectTo = urlParams.get('redirect');
+                if (redirectTo) {
+                    setTimeout(() => { window.location.href = redirectTo; }, 1000);
+                } else {
+                    setTimeout(() => { showEditorSelectionPopup(); }, 1000);
+                }
             } else {
                 messageDiv.textContent = data.error || 'Google login failed';
                 messageDiv.classList.add('error');
@@ -400,3 +407,21 @@ function showResetForm(email, token) {
 }
 
 window.handleGoogleAuth = handleGoogleAuth;
+
+// When landing on login with ?token= (from Google OAuth callback with no redirect), set cookie and show editor choice popup
+function applyTokenFromUrlAndShowPopup() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    if (!token) return;
+    const isSecure = window.location.protocol === 'https:';
+    Cookies.set('token', token, { expires: 7, path: '/', secure: isSecure, sameSite: 'lax' });
+    urlParams.delete('token');
+    const newSearch = urlParams.toString();
+    window.history.replaceState({}, '', window.location.pathname + (newSearch ? '?' + newSearch : ''));
+    showEditorSelectionPopup();
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', applyTokenFromUrlAndShowPopup);
+} else {
+    applyTokenFromUrlAndShowPopup();
+}

@@ -12,7 +12,9 @@
     <div class="container">
         <h2>Register</h2>
         <form id="registerForm">
-            <input type="email" name="email" id="email" placeholder="Email" required>
+            <input type="email" name="email" id="email" placeholder="Email (e.g. you@gmail.com)" required
+                pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
+                title="Enter a valid email (e.g. name@gmail.com)">
             <input type="password" name="emailPassword" id="emailPassword"
                 placeholder="Email Password (for verification)" required>
             <input type="password" name="loginPassword" id="loginPassword"

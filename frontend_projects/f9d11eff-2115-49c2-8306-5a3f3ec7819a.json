@@ -1,0 +1,62 @@
+{
+  "id": "f9d11eff-2115-49c2-8306-5a3f3ec7819a",
+  "name": "Secure Note",
+  "files": {
+    "html": {
+      "notes.html": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<title>Secure Notes</title>\n<link rel=\"stylesheet\" href=\"notes.css\">\n</head>\n<body>\n\n\n<div class=\"app-box\">\n<h2>Secure Notes</h2>\n\n\n<div class=\"input-group\">\n<img src=\"avatar.png\" class=\"icon\">\n<input type=\"text\" id=\"owner\" placeholder=\"Note Owner\">\n</div>\n\n\n<div class=\"input-group\">\n<img src=\"pad lock.png\" class=\"icon\">\n<textarea id=\"note\" placeholder=\"Write your secret note...\"></textarea>\n</div>\n\n\n<button onclick=\"saveNote()\">\n<img src=\"lock.png\" class=\"btn-icon\"> Save Note\n</button>\n\n\n<div id=\"output\"></div>\n\n\n<a href=\"about.html\" class=\"link\">About App</a>\n</div>\n\n\n<script src=\"notes.js\"></script>\n</body>\n</html>",
+      "about.html": "<!DOCTYPE html>\n<html>\n<head>\n<title>About</title>\n<link rel=\"stylesheet\" href=\"about.css\">\n</head>\n<body>\n<div class=\"box\">\n<h2>About Secure Notes</h2>\n<p>This is a frontend-only application built using HTML, CSS, and JavaScript.</p>\n<a href=\"notes.html\">Back</a>\n</div>\n<script src=\"js/about.js\"></script>\n</body>\n</html>"
+    },
+    "css": {
+      "notes.css": "body {\nfont-family: Arial;\nbackground: #e8f5e9;\n}\n\n\n.app-box {\nwidth: 350px;\nmargin: 80px auto;\nbackground: white;\npadding: 20px;\nborder-radius: 10px;\n}\n\n\n.input-group {\ndisplay: flex;\nalign-items: center;\nmargin-bottom: 10px;\n}\n\n\n.icon {\nwidth: 24px;\nmargin-right: 10px;\n}\n\n\ntextarea, input {\nwidth: 100%;\npadding: 8px;\n}\n\n\nbutton {\nwidth: 100%;\npadding: 10px;\nbackground: #2e7d32;\ncolor: white;\nborder: none;\ncursor: pointer;\n}\n\n\n.btn-icon {\nwidth: 16px;\n}\n\n\n#output {\nmargin-top: 15px;\nfont-weight: bold;\n}",
+      "about.css": "body {\nfont-family: Arial;\nbackground: #fff3e0;\n}\n\n\n.box {\nwidth: 300px;\nmargin: 100px auto;\nbackground: white;\npadding: 20px;\nborder-radius: 8px;\n}"
+    },
+    "js": {
+      "notes.js": "function saveNote() {\nconst owner = document.getElementById('owner').value;\nconst note = document.getElementById('note').value;\n\n\nif (owner === '' || note === '') {\nalert('Please fill all fields');\nreturn;\n}\n\n\ndocument.getElementById('output').innerText = `Note saved for ${owner}`;\n}",
+      "about.js": "console.log('About page loaded');"
+    },
+    "database": {
+      "script.js": "const mongoose = require('mongoose');\nmodule.exports = async function connectDB() {\n  try {\n    // Uses the URI from your .env tab\n    await mongoose.connect(process.env.MONGO_URI);\n    console.log(\"✅ Database connectivity established\");\n  } catch (err) {\n    console.warn(\"⚠️ Database connection failed - Backend will still run.\");\n  }\n};"
+    },
+    "backend": {
+      "script.js": "const express = require('express');\nconst cors = require('cors');\nconst connectDB = require('./database'); // Loads from Database Tab\nconst app = express();\nconst port = process.env.PORT || 4000;\napp.use(cors());\napp.use(express.json());\n// Initialize Database\nconnectDB();\napp.get('/api/status', (req, res) => {\n    console.log(\"Status check received!\");\n    res.json({ message: \"Proxy is working and backend is online!\" });\n});\napp.get('/api/db-test', (req, res) => {\n    const mongoose = require('mongoose');\n    const isConn = mongoose.connection.readyState === 1;\n    res.json({ \n        connected: isConn, \n        status: isConn ? \"Connected to MongoDB\" : \"MongoDB Offline (Check MONGO_URI)\" \n    });\n});\napp.listen(port, () => console.log(`Backend running on port ${port}`));",
+      "server.js": "const express = require('express');\nconst mongoose = require('mongoose');\nconst cors = require('cors');\nconst Message = require('./database'); // Import model from Database tab\n\nconst app = express();\nconst port = process.env.PORT || 4000;\n\napp.use(cors());\napp.use(express.json());\n\n// Connect to DB (Make sure MONGO_URI is in .env)\nmongoose.connect(process.env.MONGO_URI)\n    .then(() => console.log('✅ Connected to MongoDB'))\n    .catch(err => console.error('❌ DB Error:', err));\n\n// Routes\napp.get('/api/messages', async (req, res) => {\n    try {\n        const messages = await Message.find().sort({ createdAt: -1 }).limit(10);\n        res.json(messages);\n    } catch (err) {\n        res.status(500).json({ error: err.message });\n    }\n});\n\napp.post('/api/messages', async (req, res) => {\n    try {\n        const newMessage = new Message(req.body);\n        await newMessage.save();\n        res.json(newMessage);\n    } catch (err) {\n        res.status(500).json({ error: err.message });\n    }\n});\n\napp.listen(port, () => console.log(`Running on ${port}`));",
+      "database.js": "const mongoose = require('mongoose');\n\nmodule.exports = async function connectDB() {\n  try {\n    await mongoose.connect(process.env.MONGO_URI);\n    console.log(\"✅ Database connectivity established\");\n  } catch (err) {\n    console.warn(\"⚠️ Database connection failed - Backend will still run.\");\n  }\n};",
+      "package.json": "{\n  \"name\": \"integration-test\",\n  \"version\": \"1.0.0\",\n  \"main\": \"server.js\",\n  \"dependencies\": {\n    \"express\": \"^4.18.2\",\n    \"mongoose\": \"^7.6.3\",\n    \"cors\": \"^2.8.5\"\n  }\n}"
+    },
+    "env": {
+      "script.js": "MONGO_URI=mongodb://127.0.0.1:27017/playground\n# Note: PORT is managed automatically by the playground now!"
+    }
+  },
+  "assets": [
+    {
+      "id": "9929020f-e1b7-451e-81fe-3229becd38fb",
+      "filename": "lock.png",
+      "size": 11207,
+      "mimetype": "image/png",
+      "url": "http://localhost:3000/api/frontend/asset/9929020f-e1b7-451e-81fe-3229becd38fb",
+      "uploadedAt": "2026-02-05T20:37:50.693Z"
+    },
+    {
+      "id": "c7bdf901-3de8-4f28-9285-6e84623ff826",
+      "filename": "avatar.png",
+      "size": 17849,
+      "mimetype": "image/png",
+      "url": "http://localhost:3000/api/frontend/asset/c7bdf901-3de8-4f28-9285-6e84623ff826",
+      "uploadedAt": "2026-02-05T20:37:56.793Z"
+    },
+    {
+      "id": "4da17021-bf6a-4f4b-b3da-2d387e98ba18",
+      "filename": "pad lock.png",
+      "size": 8813,
+      "mimetype": "image/png",
+      "url": "http://localhost:3000/api/frontend/asset/4da17021-bf6a-4f4b-b3da-2d387e98ba18",
+      "uploadedAt": "2026-02-05T20:38:53.003Z"
+    }
+  ],
+  "structure": {},
+  "userId": "680483f32d4f412b45cdb1c8",
+  "userEmail": "samhith_basa@srmap.edu.in",
+  "createdAt": "2026-02-10T11:15:06.466Z",
+  "updatedAt": "2026-02-10T11:15:06.466Z",
+  "deploymentHTML": "<!DOCTYPE html>\n<html>\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <title>Secure Note</title>\n    <style>\n        /* notes.css */\nbody {\nfont-family: Arial;\nbackground: #e8f5e9;\n}\n\n\n.app-box {\nwidth: 350px;\nmargin: 80px auto;\nbackground: white;\npadding: 20px;\nborder-radius: 10px;\n}\n\n\n.input-group {\ndisplay: flex;\nalign-items: center;\nmargin-bottom: 10px;\n}\n\n\n.icon {\nwidth: 24px;\nmargin-right: 10px;\n}\n\n\ntextarea, input {\nwidth: 100%;\npadding: 8px;\n}\n\n\nbutton {\nwidth: 100%;\npadding: 10px;\nbackground: #2e7d32;\ncolor: white;\nborder: none;\ncursor: pointer;\n}\n\n\n.btn-icon {\nwidth: 16px;\n}\n\n\n#output {\nmargin-top: 15px;\nfont-weight: bold;\n}\n\n/* about.css */\nbody {\nfont-family: Arial;\nbackground: #fff3e0;\n}\n\n\n.box {\nwidth: 300px;\nmargin: 100px auto;\nbackground: white;\npadding: 20px;\nborder-radius: 8px;\n}\n    </style>\n</head>\n<body>\n    <!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<title>Secure Notes</title>\n<link rel=\"stylesheet\" href=\"notes.css\">\n</head>\n<body>\n\n\n<div class=\"app-box\">\n<h2>Secure Notes</h2>\n\n\n<div class=\"input-group\">\n<img src=\"http://localhost:3000/api/frontend/asset/c7bdf901-3de8-4f28-9285-6e84623ff826\" class=\"icon\">\n<input type=\"text\" id=\"owner\" placeholder=\"Note Owner\">\n</div>\n\n\n<div class=\"input-group\">\n<img src=\"http://localhost:3000/api/frontend/asset/4da17021-bf6a-4f4b-b3da-2d387e98ba18\" class=\"icon\">\n<textarea id=\"note\" placeholder=\"Write your secret note...\"></textarea>\n</div>\n\n\n<button onclick=\"saveNote()\">\n<img src=\"http://localhost:3000/api/frontend/asset/9929020f-e1b7-451e-81fe-3229becd38fb\" class=\"btn-icon\"> Save Note\n</button>\n\n\n<div id=\"output\"></div>\n\n\n<a href=\"about.html\" class=\"link\">About App</a>\n</div>\n\n\n<script src=\"notes.js\"></script>\n</body>\n</html>\n    <script>\n        // === AUTO-WRAPPED JAVASCRIPT ===\n        // All functions are automatically made global\n        \n        // 1. Execute the user's original code first\n        try {\n            (function() {\n                // User's original code (preserved for debugging)\n                // notes.js\nfunction saveNote() {\nconst owner = document.getElementById('owner').value;\nconst note = document.getElementById('note').value;\n\n\nif (owner === '' || note === '') {\nalert('Please fill all fields');\nreturn;\n}\n\n\ndocument.getElementById('output').innerText = `Note saved for ${owner}`;\n}\n\n// about.js\nconsole.log('About page loaded');\n            })();\n        } catch(error) {\n            console.error('User code error:', error);\n        }\n        \n        // 2. AUTO-WRAPPED VERSION - Makes everything work automatically\n        (function() {\n            // Processed version with auto-wrapped functions\n            if (typeof saveNote === 'function' && !window.saveNote) window.saveNote = saveNote;\n// notes.js\nwindow.saveNote = function() {\nconst owner = document.getElementById('owner').value;\nconst note = document.getElementById('note').value;\n\n\nif (owner === '' || note === '') {\nalert('Please fill all fields');\nreturn;\n}\n\n\ndocument.getElementById('output').innerText = `Note saved for ${owner}`;\n}\n\n// about.js\nconsole.log('About page loaded');\n        })();\n        \n        // 3. Universal event handler for onclick events\n        document.addEventListener('DOMContentLoaded', function() {\n            console.log('Deployed project loaded: \"Secure Note\"');\n            \n            // Auto-bind all onclick handlers\n            document.addEventListener('click', function(e) {\n                if (e.target.hasAttribute('onclick')) {\n                    const handler = e.target.getAttribute('onclick');\n                    try {\n                        // Try to execute as is\n                        eval(handler);\n                    } catch(error) {\n                        console.warn('onclick handler error:', error);\n                        // Try to find and call the function\n                        const funcName = handler.replace(/(.*)/, '').trim();\n                        if (typeof window[funcName] === 'function') {\n                            window[funcName]();\n                        }\n                    }\n                }\n            });\n            \n            // Auto-call init() or main() if they exist\n            setTimeout(() => {\n                if (typeof window.init === 'function') window.init();\n                if (typeof window.main === 'function') window.main();\n                if (typeof window.onload === 'function') window.onload();\n            }, 100);\n        });\n        \n        // 4. Make sure DOMContentLoaded fires even if already loaded\n        if (document.readyState === 'loading') {\n            document.addEventListener('DOMContentLoaded', function() {\n                console.log('DOMContentLoaded fired');\n            });\n        } else {\n            console.log('DOM already loaded, triggering event');\n            document.dispatchEvent(new Event('DOMContentLoaded'));\n        }\n    </script>\n</body>\n</html>"
+}

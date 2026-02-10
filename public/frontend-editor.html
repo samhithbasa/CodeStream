@@ -15,6 +15,10 @@
             <h1>🌙 Simple Web Playground</h1>
         </div>
         <div class="header-right">
+            <button id="toggle-preview" class="btn btn-small preview-toggle-btn" title="Toggle Live Preview">
+                <img src="/images/delete.png" alt="Preview" id="preview-toggle-icon" class="preview-icon"
+                    style="display: inline-block;">
+            </button>
             <input type="text" id="project-name" placeholder="Project Name" class="night-input">
             <button id="save-project" class="btn btn-primary">
                 💾 Save & Deploy
@@ -35,11 +39,37 @@
                 <button class="tab-btn active" data-tab="html">HTML</button>
                 <button class="tab-btn" data-tab="css">CSS</button>
                 <button class="tab-btn" data-tab="js">JavaScript</button>
-                <button class="tab-btn" data-tab="preview">Live Preview</button>
+                <button class="tab-btn" data-tab="assets">📦 Assets</button>
+            </div>
+
+            <!-- Assets Tab Content -->
+            <div class="tab-content" id="assets-tab">
+                <div class="assets-container">
+                    <div class="assets-header">
+                        <h3>Project Assets</h3>
+                        <button id="upload-asset-btn" class="btn btn-primary">📤 Upload Asset</button>
+                    </div>
+                    <input type="file" id="asset-file-input" multiple accept="image/*,font/*,.woff,.woff2,.ttf,.otf"
+                        style="display: none;">
+                    <div id="assets-dropzone" class="assets-dropzone">
+                        <p>📦 Drag & drop assets here or click to browse</p>
+                        <p class="assets-hint">Supported: Images (PNG, JPG, SVG, GIF), Fonts (WOFF, WOFF2, TTF, OTF)</p>
+                    </div>
+                    <div id="assets-list" class="assets-list">
+                        <p class="no-assets">No assets uploaded yet. Upload assets to use them in your project.</p>
+                    </div>
+                </div>
             </div>
 
             <div class="editor-content">
                 <div class="tab-content active" id="html-tab">
+                    <div class="file-toolbar" data-type="html">
+                        <span class="file-toolbar-title">HTML Files</span>
+                        <select id="html-file-select"></select>
+                        <button id="add-html-file" class="btn btn-small">＋ New</button>
+                        <button id="rename-html-file" class="btn btn-small">Rename</button>
+                        <button id="delete-html-file" class="btn btn-small btn-danger">Delete</button>
+                    </div>
                     <textarea id="html-editor" placeholder="Write your HTML here...">&lt;!DOCTYPE html&gt;
 &lt;html&gt;
 &lt;head&gt;
@@ -54,6 +84,13 @@
                 </div>
 
                 <div class="tab-content" id="css-tab">
+                    <div class="file-toolbar" data-type="css">
+                        <span class="file-toolbar-title">CSS Files</span>
+                        <select id="css-file-select"></select>
+                        <button id="add-css-file" class="btn btn-small">＋ New</button>
+                        <button id="rename-css-file" class="btn btn-small">Rename</button>
+                        <button id="delete-css-file" class="btn btn-small btn-danger">Delete</button>
+                    </div>
                     <textarea id="css-editor" placeholder="Write your CSS here...">body {
     font-family: Arial, sans-serif;
     max-width: 800px;
@@ -89,6 +126,13 @@ button:hover {
                 </div>
 
                 <div class="tab-content" id="js-tab">
+                    <div class="file-toolbar" data-type="js">
+                        <span class="file-toolbar-title">JavaScript Files</span>
+                        <select id="js-file-select"></select>
+                        <button id="add-js-file" class="btn btn-small">＋ New</button>
+                        <button id="rename-js-file" class="btn btn-small">Rename</button>
+                        <button id="delete-js-file" class="btn btn-small btn-danger">Delete</button>
+                    </div>
                     <textarea id="js-editor" placeholder="Write your JavaScript here...">function showAlert() {
     alert('Hello from JavaScript! 🎉');
     
@@ -109,7 +153,8 @@ document.addEventListener('DOMContentLoaded', function() {
 });</textarea>
                 </div>
 
-                <div class="tab-content" id="preview-tab">
+                <!-- Live Preview Panel (shown/hidden by toggle button) -->
+                <div id="live-preview-panel" class="live-preview-panel" style="display: none;">
                     <div class="preview-controls">
                         <button id="refresh-preview" class="btn btn-small">🔄 Refresh</button>
                         <button id="fullscreen-preview" class="btn btn-small">📺 Fullscreen</button>
@@ -364,32 +409,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.log('DEBUG: Token found in URL:', token.substring(0, 20) + '...');
 
                 if (!freshLogin) {
-                    console.log('DEBUG: First time login, processing token...');
-
-                    // Store token in cookies
+                    // User landed here after Google login (from frontend playground) — just set cookie and clean URL, no popup
+                    const isSecure = window.location.protocol === 'https:';
                     Cookies.set('token', token, {
                         expires: 7,
                         path: '/',
-                        secure: true,
-                        sameSite: 'strict'
+                        secure: isSecure,
+                        sameSite: 'lax'
                     });
-                    console.log('DEBUG: Token stored in cookies');
-
-                    // Mark as processed
                     sessionStorage.setItem('fresh_login', 'true');
-                    console.log('DEBUG: fresh_login set in sessionStorage');
-
-                    // Clean URL
                     const cleanURL = window.location.pathname;
                     window.history.replaceState({}, document.title, cleanURL);
-                    console.log('DEBUG: URL cleaned to:', cleanURL);
-
-                    // Show popup after a short delay to ensure page is ready
-                    setTimeout(() => {
-                        console.log('DEBUG: Showing selection popup');
-                        showEditorSelectionPopup();
-                    }, 1000);
-
                 } else {
                     console.log('DEBUG: Already processed this login, skipping popup');
                 }
@@ -403,16 +433,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if (document.readyState === 'loading') {
             console.log('DEBUG: Document still loading, waiting for DOMContentLoaded');
         } else {
-            console.log('DEBUG: Document already ready, checking for token immediately');
             const urlParams = new URLSearchParams(window.location.search);
             const token = urlParams.get('token');
             if (token && !sessionStorage.getItem('fresh_login')) {
-                console.log('DEBUG: Immediate token check - token found');
-                // Process immediately
-                Cookies.set('token', token, { expires: 7, path: '/' });
+                const isSecure = window.location.protocol === 'https:';
+                Cookies.set('token', token, { expires: 7, path: '/', secure: isSecure, sameSite: 'lax' });
                 sessionStorage.setItem('fresh_login', 'true');
                 window.history.replaceState({}, document.title, window.location.pathname);
-                setTimeout(() => showEditorSelectionPopup(), 1000);
             }
         }
     </script>

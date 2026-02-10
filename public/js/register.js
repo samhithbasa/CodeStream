@@ -49,6 +49,8 @@ document.addEventListener('DOMContentLoaded', () => {
         resendOtp.style.display = 'none';
     };
 
+    const isValidEmail = (value) => /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(value);
+
     // Add this at the beginning of your getOtpBtn click handler
     getOtpBtn.addEventListener('click', async (e) => {
         e.preventDefault(); // Prevent default form submission behavior
@@ -59,6 +61,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!email || !emailPassword || !loginPassword) {
             showMessage('All fields are required', 'error');
+            return;
+        }
+
+        if (!isValidEmail(email)) {
+            showMessage('Please enter a valid email (e.g. name@gmail.com)', 'error');
             return;
         }
 
