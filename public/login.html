@@ -66,6 +66,25 @@
       }
     });
 
+    // Check for Google OAuth token
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+
+    if (token) {
+      console.log("Token found in URL, saving cookie...");
+      // Store token in cookies
+      const isSecure = window.location.protocol === 'https:';
+      Cookies.set('token', token, {
+        expires: 7,
+        path: '/',
+        secure: isSecure,
+        sameSite: 'lax'
+      });
+
+      // Redirect to editor
+      window.location.href = '/editor';
+    }
+
     function showMessage(msg, type) {
       const messageBox = document.getElementById('message');
       messageBox.textContent = msg;
