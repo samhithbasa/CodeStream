@@ -585,14 +585,22 @@ app.post('/send-otp', otpLimiter, async (req, res) => {
             `
         };
 
+        console.log('Attempting to send OTP email to:', email);
+        console.log('Using EMAIL_USER:', process.env.EMAIL_USER ? 'Set' : 'Not Set');
+
         await transporter.sendMail(mailOptions);
         console.log('Email sent successfully to:', email);
         res.json({ message: 'OTP sent successfully' });
     } catch (error) {
-        console.error('Email sending error:', error);
+        console.error('Email sending error details:', {
+            message: error.message,
+            stack: error.stack,
+            code: error.code,
+            command: error.command
+        });
         res.status(500).json({
             error: 'Failed to send OTP',
-            details: process.env.NODE_ENV === 'development' ? error.message : null
+            details: error.message
         });
     }
 });
