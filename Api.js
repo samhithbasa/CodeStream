@@ -129,29 +129,28 @@ async function startServer() {
     }
 }
 
-async function sendEmailBrevo(to, subject, htmlContent) {
-    const apiKey = process.env.BREVO_API_KEY;
+async function sendEmailResend(to, subject, htmlContent) {
+    const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) {
-        throw new Error('BREVO_API_KEY is not defined in environment variables');
+        throw new Error('RESEND_API_KEY is not defined in environment variables');
     }
 
     const data = JSON.stringify({
-        sender: { name: "Code Editor", email: process.env.EMAIL_USER },
-        to: [{ email: to }],
+        from: 'onboarding@resend.dev', // Default for free tier without custom domain
+        to: to,
         subject: subject,
-        htmlContent: htmlContent
+        html: htmlContent
     });
 
     const options = {
-        hostname: 'api.brevo.com',
+        hostname: 'api.resend.com',
         port: 443,
-        path: '/v3/smtp/email',
+        path: '/emails',
         method: 'POST',
         headers: {
-            'accept': 'application/json',
-            'api-key': apiKey,
-            'content-type': 'application/json',
-            'content-length': data.length
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'Content-Length': data.length
         }
     };
 
@@ -163,7 +162,7 @@ async function sendEmailBrevo(to, subject, htmlContent) {
                 if (res.statusCode >= 200 && res.statusCode < 300) {
                     resolve(JSON.parse(body));
                 } else {
-                    reject(new Error(`Brevo API error: ${res.statusCode} ${body}`));
+                    reject(new Error(`Resend API error: ${res.statusCode} ${body}`));
                 }
             });
         });
@@ -407,7 +406,7 @@ function authenticateAdmin(req, res, next) {
 
 app.get('/test-email', async (req, res) => {
     try {
-        await sendEmailBrevo(process.env.EMAIL_USER, 'Test Email', 'This is a test email');
+        await sendEmailResend(process.env.EMAIL_USER, 'Test Email', 'This is a test email');
         res.send('Test email sent successfully');
     } catch (error) {
         console.error('Test email failed:', error);
@@ -465,7 +464,7 @@ app.post('/api/contact', async (req, res) => {
         // Save to database
         await contactSubmissions.insertOne(ticket);
 
-        await sendEmailBrevo(email, `Ticket Created: ${ticket.ticketId}`, `
+        await sendEmailResend(email, `Ticket Created: ${ticket.ticketId}`, `
                 <h2>Thank you for contacting us!</h2>
                 <p>We've received your message and will respond within 24 hours.</p>
                 <p><strong>Ticket ID:</strong> ${ticket.ticketId}</p>
@@ -529,7 +528,7 @@ app.put('/api/admin/tickets/:id', authenticateAdmin, async (req, res) => {
 
 async function sendResolutionEmail(ticket) {
     try {
-        await sendEmailBrevo(ticket.email, `Your ticket ${ticket.ticketId} has been resolved`, `
+        await sendEmailResend(ticket.email, `Your ticket ${ticket.ticketId} has been resolved`, `
                 <h2>Your Support Ticket Has Been Resolved</h2>
                 <p>Hello ${ticket.name},</p>
                 <p>We're happy to inform you that your support ticket has been resolved.</p>
@@ -595,7 +594,7 @@ app.post('/send-otp', otpLimiter, async (req, res) => {
         console.log('Attempting to send OTP email to:', email);
         console.log('Using EMAIL_USER:', process.env.EMAIL_USER ? 'Set' : 'Not Set');
 
-        await sendEmailBrevo(email, 'Your OTP for Registration', `
+        await sendEmailResend(email, 'Your OTP for Registration', `
                 <h2>Your OTP Code</h2>
                 <p>Your OTP is: <strong>${otp}</strong></p>
                 <p>It will expire in 5 minutes.</p>
@@ -745,7 +744,7 @@ app.post('/forgot-password', passwordResetLimiter, async (req, res) => {
 
         const resetLink = `http://localhost:3000/reset-password?token=${token}`;
 
-        await sendEmailBrevo(email, 'Password Reset Request', `
+        await sendEmailResend(email, 'Password Reset Request', `
                 <h2>Password Reset</h2>
                 <p>You requested to reset your password. Click the link below to proceed:</p>
                 <a href="${resetLink}">Reset Password</a>
