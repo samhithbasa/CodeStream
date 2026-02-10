@@ -242,6 +242,7 @@
         });
 
         document.addEventListener("DOMContentLoaded", async () => {
+            // 1. Initialize Theme
             const savedTheme = localStorage.getItem('theme');
             const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
             isDark = savedTheme ? (savedTheme === 'dark') : systemDark;
@@ -249,33 +250,17 @@
             moon.src = isDark ? 'images/sun.webp' : 'images/moon.png';
             editor.setOption("theme", isDark ? 'material-darker' : 'solarized');
 
-            document.getElementById("c++").classList.add('active-language');
-
-            await handleGoogleAuth();
-            await verifyAuthStatus();
-            checkRedirectAfterLogin();
-
-            if (currentUser) {
-                loadSavedCodes();
+            // 2. Initialize UI Defaults
+            if (document.getElementById("c++")) {
+                document.getElementById("c++").classList.add('active-language');
             }
-        });
 
-        // In code.html, replace the existing Google OAuth handling section with this:
-
-        // Handle Google OAuth redirect with token
-        document.addEventListener('DOMContentLoaded', function () {
+            // 3. Handle Google Auth Redirect (Token in URL)
             const urlParams = new URLSearchParams(window.location.search);
             const token = urlParams.get('token');
-            const freshLogin = sessionStorage.getItem('fresh_login');
 
-            console.log('DEBUG Code Editor: Token check', {
-                tokenExists: !!token,
-                freshLogin: freshLogin,
-                url: window.location.href
-            });
-
-            if (token && !freshLogin) {
-                // Store token in cookies (works on HTTP localhost too)
+            if (token) {
+                console.log("Found token in URL, setting cookie...");
                 const isSecure = window.location.protocol === 'https:';
                 Cookies.set('token', token, {
                     expires: 7,
@@ -284,39 +269,47 @@
                     sameSite: 'lax'
                 });
 
-                sessionStorage.setItem('fresh_login', 'true');
-
                 // Clean URL
-                const cleanURL = window.location.pathname;
-                window.history.replaceState({}, document.title, cleanURL);
+                window.history.replaceState({}, document.title, window.location.pathname);
 
-                // Restore pending code if user had tried to save before redirect to login
-                const pending = sessionStorage.getItem('pendingCode');
-                if (pending) {
-                    try {
-                        const { code, lang, name } = JSON.parse(pending);
-                        if (editor && editor.setValue) editor.setValue(code || '');
-                        if (lang && languageModes) {
-                            const key = ({ 'Cpp': 'c++', 'C': 'c', 'Java': 'java', 'Python': 'python' })[lang] || 'c++';
-                            if (languageModes[key]) {
-                                selectedLanguage = languageModes[key].lang;
-                                editor.setOption('mode', languageModes[key].mode);
-                                document.querySelectorAll('.icons img').forEach(img => img.classList.remove('active-language'));
-                                const icon = document.getElementById(key);
-                                if (icon) icon.classList.add('active-language');
-                            }
-                        }
-                        sessionStorage.removeItem('pendingCode');
-                        if (typeof showNotification === 'function') showNotification('Logged in! You can save your code now.');
-                        if (typeof showSavePopup === 'function') showSavePopup();
-                    } catch (e) { /* ignore */ }
-                }
-                verifyAuthStatus();
-            } else {
-                // Regular auth check
-                verifyAuthStatus();
+                // Restore pending code if any
+                restorePendingCode();
+            }
+
+            // 4. Verify Auth Status & Load Data
+            await verifyAuthStatus();
+            checkRedirectAfterLogin();
+
+            if (currentUser) {
+                loadSavedCodes();
             }
         });
+
+        function restorePendingCode() {
+            const pending = sessionStorage.getItem('pendingCode');
+            if (pending) {
+                try {
+                    const { code, lang } = JSON.parse(pending);
+                    if (editor && editor.setValue) editor.setValue(code || '');
+
+                    if (lang && languageModes) {
+                        const key = ({ 'Cpp': 'c++', 'C': 'c', 'Java': 'java', 'Python': 'python' })[lang] || 'c++';
+                        if (languageModes[key]) {
+                            selectedLanguage = languageModes[key].lang;
+                            editor.setOption('mode', languageModes[key].mode);
+                            document.querySelectorAll('.icons img').forEach(img => img.classList.remove('active-language'));
+                            const icon = document.getElementById(key);
+                            if (icon) icon.classList.add('active-language');
+                        }
+                    }
+                    sessionStorage.removeItem('pendingCode');
+                    if (typeof showNotification === 'function') showNotification('Logged in! You can save your code now.');
+                    if (typeof showSavePopup === 'function') showSavePopup();
+                } catch (e) { console.error("Error restoring code:", e); }
+            }
+        }
+
+
 
         // Add this function to code.html script section
         function showEditorSelectionPopup() {
@@ -727,32 +720,7 @@
             }
         });
 
-        async function handleGoogleAuth() {
-            try {
-                const urlParams = new URLSearchParams(window.location.search);
-                const token = urlParams.get('token');
 
-                if (token) {
-                    Cookies.set('token', token, { expires: 7 });
-                    window.history.replaceState({}, document.title, window.location.pathname);
-                    await verifyAuthStatus();
-                    loadSavedCodes();
-                    return true;
-                }
-
-                const cookieToken = Cookies.get('token');
-                if (cookieToken) {
-                    await verifyAuthStatus();
-                    loadSavedCodes();
-                    return true;
-                }
-
-                return false;
-            } catch (error) {
-                console.error('Google auth handling failed:', error);
-                return false;
-            }
-        }
 
         async function verifyAuthStatus() {
             const token = Cookies.get('token');
