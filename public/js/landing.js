@@ -3,12 +3,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     let gitIcon = document.getElementById("git")?.querySelector("img");
 
     if (icon) {
-        icon.onclick = function() {
+        icon.onclick = function () {
             document.body.classList.toggle("dark-theme");
-            
+
             if (document.body.classList.contains("dark-theme")) {
                 icon.src = "images/sun.webp";
-                if (gitIcon) gitIcon.src = "images/image.png"; 
+                if (gitIcon) gitIcon.src = "images/image.png";
                 localStorage.setItem('theme', 'dark');
             } else {
                 icon.src = "images/moon.png";
@@ -17,7 +17,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
         };
 
-       
+
         const savedTheme = localStorage.getItem('theme');
         if (savedTheme === 'dark') {
             document.body.classList.add("dark-theme");
@@ -26,16 +26,19 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
     }
 
-   
+
     await updateAuthUI();
 });
 
 async function updateAuthUI() {
     const authItem = document.getElementById('auth-item');
+    const profileItem = document.getElementById('profile-item');
+    const adminItem = document.getElementById('admin-item');
+
     if (!authItem) return;
-    
+
     const token = Cookies.get('token');
-    
+
     if (token) {
         try {
             const response = await fetch('/verify-token', {
@@ -43,15 +46,27 @@ async function updateAuthUI() {
                     'Authorization': `Bearer ${token}`
                 }
             });
-            
+
             if (response.ok) {
-              
+                const data = await response.json();
+
+                // Show logout button
                 authItem.innerHTML = `
                     <button id="logout-btn" class="logout-btn">
                         Logout
                     </button>
                 `;
-                
+
+                // Show profile icon for all logged-in users
+                if (profileItem) {
+                    profileItem.style.display = 'block';
+                }
+
+                // Show admin button only for admin users
+                if (adminItem && data.user && data.user.isAdmin) {
+                    adminItem.style.display = 'block';
+                }
+
                 document.getElementById('logout-btn').addEventListener('click', async () => {
                     try {
                         await fetch('/logout', {
@@ -60,7 +75,7 @@ async function updateAuthUI() {
                                 'Authorization': `Bearer ${token}`
                             }
                         });
-                        
+
                         Cookies.remove('token', { path: '/' });
                         window.location.href = '/landing.html';
                     } catch (error) {
@@ -72,13 +87,21 @@ async function updateAuthUI() {
         } catch (error) {
             console.error('Token verification failed:', error);
         }
-        
-       
+
+        // Invalid token - remove it
         Cookies.remove('token', { path: '/' });
     }
-    
-   
+
+    // Not logged in - show login link and hide profile/admin
     authItem.innerHTML = `
         <a href="/login.html">Login/Sign Up</a>
     `;
+
+    if (profileItem) {
+        profileItem.style.display = 'none';
+    }
+
+    if (adminItem) {
+        adminItem.style.display = 'none';
+    }
 }
