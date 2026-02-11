@@ -59,6 +59,30 @@ async function updateAuthUI() {
 
                 // Show profile icon for all logged-in users
                 if (profileItem) {
+                    const profileLink = profileItem.querySelector('a');
+                    const profileImg = profileLink.querySelector('img');
+
+                    if (data.user && data.user.picture) {
+                        profileImg.src = data.user.picture;
+                    } else {
+                        profileImg.src = 'images/user-icon.png';
+                    }
+
+                    // Apply modern styling
+                    profileImg.style.cssText = `
+                        width: 35px;
+                        height: 35px;
+                        border-radius: 50%;
+                        cursor: pointer;
+                        border: 2px solid white;
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+                        object-fit: cover;
+                        transition: transform 0.3s ease;
+                    `;
+
+                    profileImg.onmouseover = () => profileImg.style.transform = 'scale(1.1)';
+                    profileImg.onmouseout = () => profileImg.style.transform = 'scale(1)';
+
                     profileItem.style.display = 'block';
                 }
 
