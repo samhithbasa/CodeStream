@@ -340,6 +340,11 @@ app.get('/pricing', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'pricing.html'));
 });
 
+app.get('/profile', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'profile.html'));
+});
+
+
 // Google OAuth routes
 app.get('/auth/google', (req, res) => {
     const redirectPath = req.query.redirect || '';
@@ -802,9 +807,68 @@ app.post('/login', async (req, res) => {
         });
     } catch (error) {
         console.error('Login error:', error);
-        res.status(500).json({ error: 'Login failed' });
     }
 });
+
+// Delete user account and all associated data
+app.delete('/api/delete-account', authenticateToken, async (req, res) => {
+    try {
+        const { password } = req.body;
+        const userId = req.user.userId;
+        const db = getDb();
+        const users = db.collection('users');
+        const codes = db.collection('codes');
+        const sharedCodes = db.collection('sharedCodes');
+
+        // Get user to verify password
+        const user = await users.findOne({ _id: new ObjectId(userId) });
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Verify password (skip for Google OAuth users)
+        if (user.loginPassword) {
+            if (!password) {
+                return res.status(400).json({ error: 'Password required for account deletion' });
+            }
+            const isMatch = await bcrypt.compare(password, user.loginPassword);
+            if (!isMatch) {
+                return res.status(401).json({ error: 'Incorrect password' });
+            }
+        }
+
+        // Delete all user data
+        // 1. Delete saved codes
+        await codes.deleteMany({ userId: userId.toString() });
+
+        // 2. Delete shared codes
+        await sharedCodes.deleteMany({ userId: userId.toString() });
+
+        // 3. Delete frontend projects (files from filesystem)
+        const frontendProjectsPath = path.join(__dirname, 'frontend_projects', userId.toString());
+        if (fs.existsSync(frontendProjectsPath)) {
+            fs.rmSync(frontendProjectsPath, { recursive: true, force: true });
+        }
+
+        // 4. Delete saved code files
+        const savedCodesPath = path.join(__dirname, 'saved_codes', userId.toString());
+        if (fs.existsSync(savedCodesPath)) {
+            fs.rmSync(savedCodesPath, { recursive: true, force: true });
+        }
+
+        // 5. Delete user account
+        await users.deleteOne({ _id: new ObjectId(userId) });
+
+        res.json({
+            message: 'Account and all associated data deleted successfully',
+            success: true
+        });
+    } catch (error) {
+        console.error('Account deletion error:', error);
+        res.status(500).json({ error: 'Failed to delete account' });
+    }
+});
+
 
 app.post('/forgot-password', passwordResetLimiter, async (req, res) => {
     try {
