@@ -24,6 +24,11 @@ const app = express();
 app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 
+const ADMIN_EMAILS = [
+    'samhith_basa@srmap.edu.in',
+    'samhithbasa12@gmail.com'
+];
+
 // Middleware for parsing multipart/form-data (for asset uploads)
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -398,7 +403,8 @@ app.get('/auth/google/callback', async (req, res) => {
         const token = jwt.sign(
             {
                 userId: user._id,
-                email: user.email
+                email: user.email,
+                isAdmin: ADMIN_EMAILS.includes(user.email) || user.isAdmin === true
             },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
@@ -484,7 +490,9 @@ function authenticateAdmin(req, res, next) {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
         // Explicit admin check
-        if (!decoded.isAdmin) {
+        const isUserAdmin = decoded.isAdmin || ADMIN_EMAILS.includes(decoded.email);
+
+        if (!isUserAdmin) {
             return res.status(403).json({
                 error: 'Admin access required',
                 details: decoded
@@ -768,7 +776,13 @@ function authenticateToken(req, res, next) {
 }
 
 app.get('/verify-token', authenticateToken, (req, res) => {
-    res.json({ valid: true, user: req.user });
+    res.json({
+        valid: true,
+        user: {
+            ...req.user,
+            isAdmin: ADMIN_EMAILS.includes(req.user.email) || req.user.isAdmin === true
+        }
+    });
 });
 
 app.post('/login', async (req, res) => {
@@ -790,7 +804,8 @@ app.post('/login', async (req, res) => {
         const token = jwt.sign(
             {
                 userId: user._id,
-                email: user.email
+                email: user.email,
+                isAdmin: ADMIN_EMAILS.includes(user.email) || user.isAdmin === true
             },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
@@ -898,7 +913,9 @@ app.post('/forgot-password', passwordResetLimiter, async (req, res) => {
             { upsert: true }
         );
 
-        const resetLink = `http://localhost:3000/reset-password?token=${token}`;
+        const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+        const host = req.headers.host;
+        const resetLink = `${protocol}://${host}/reset-password?token=${token}`;
 
         await sendEmail(email, 'Password Reset Request', `
                 <h2>Password Reset</h2>

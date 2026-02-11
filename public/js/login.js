@@ -1,38 +1,38 @@
 document.getElementById('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    
+
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
     const messageDiv = document.getElementById('message');
-    
+
     messageDiv.textContent = '';
     messageDiv.className = 'message';
-    
+
     try {
         const response = await fetch('/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password })
         });
-        
+
         const data = await response.json();
-        
+
         if (response.ok) {
             const isSecure = window.location.protocol === 'https:';
-            Cookies.set('token', data.token, { 
-                expires: 7, 
+            Cookies.set('token', data.token, {
+                expires: 7,
                 path: '/',
                 secure: isSecure,
                 sameSite: 'lax'
             });
-            
+
             messageDiv.textContent = data.message;
             messageDiv.classList.add('success');
-            
+
             // Get the redirect URL from URL parameters or default to editor
             const urlParams = new URLSearchParams(window.location.search);
             const redirectTo = urlParams.get('redirect') || '/editor';
-            
+
             // Show editor selection popup or redirect directly
             if (redirectTo === '/editor' || redirectTo === '/frontend-editor') {
                 // Redirect directly to the specific editor
@@ -45,7 +45,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
                     showEditorSelectionPopup();
                 }, 1000);
             }
-            
+
         } else {
             messageDiv.textContent = data.error;
             messageDiv.classList.add('error');
@@ -62,25 +62,25 @@ function handleGoogleAuth(response) {
     const messageDiv = document.getElementById('message');
     messageDiv.textContent = '';
     messageDiv.className = 'message';
-    
+
     verifyGoogleToken(response.credential)
         .then(data => {
             if (data.token) {
                 const isSecure = window.location.protocol === 'https:';
-                Cookies.set('token', data.token, { 
-                    expires: 7, 
+                Cookies.set('token', data.token, {
+                    expires: 7,
                     path: '/',
                     secure: isSecure,
                     sameSite: 'lax'
                 });
-                
+
                 messageDiv.textContent = 'Google login successful!';
                 messageDiv.classList.add('success');
-                
+
                 // Get redirect URL
                 const urlParams = new URLSearchParams(window.location.search);
                 const redirectTo = urlParams.get('redirect');
-                
+
                 if (redirectTo) {
                     // Redirect directly to the requested page
                     setTimeout(() => {
@@ -109,7 +109,7 @@ function showEditorSelectionPopup() {
     // Get the original redirect parameter if it exists
     const urlParams = new URLSearchParams(window.location.search);
     const originalRedirect = urlParams.get('redirect');
-    
+
     // Create popup overlay
     const popupOverlay = document.createElement('div');
     popupOverlay.className = 'editor-selection-overlay';
@@ -261,21 +261,21 @@ function handleGoogleAuth(response) {
     const messageDiv = document.getElementById('message');
     messageDiv.textContent = '';
     messageDiv.className = 'message';
-    
+
     verifyGoogleToken(response.credential)
         .then(data => {
             if (data.token) {
                 const isSecure = window.location.protocol === 'https:';
-                Cookies.set('token', data.token, { 
-                    expires: 7, 
+                Cookies.set('token', data.token, {
+                    expires: 7,
                     path: '/',
                     secure: isSecure,
                     sameSite: 'lax'
                 });
-                
+
                 messageDiv.textContent = 'Google login successful!';
                 messageDiv.classList.add('success');
-                
+
                 const urlParams = new URLSearchParams(window.location.search);
                 const redirectTo = urlParams.get('redirect');
                 if (redirectTo) {
@@ -303,7 +303,7 @@ async function verifyGoogleToken(googleToken) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ token: googleToken })
         });
-        
+
         return await response.json();
     } catch (error) {
         console.error('Error verifying Google token:', error);
@@ -315,27 +315,27 @@ document.getElementById('forgotPassword').addEventListener('click', async (e) =>
     e.preventDefault();
     const email = document.getElementById('email').value;
     const messageDiv = document.getElementById('message');
-    
+
     if (!email) {
         messageDiv.textContent = 'Please enter your email first';
         messageDiv.classList.add('error');
         return;
     }
-    
+
     try {
         const response = await fetch('/forgot-password', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email })
         });
-        
+
         const data = await response.json();
-        
+
         if (response.ok) {
             messageDiv.textContent = data.message;
             messageDiv.classList.add('success');
-            
-            showResetForm(email, data.token);
+
+            // Removed automatic reset form display - user should use email link
         } else {
             messageDiv.textContent = data.error;
             messageDiv.classList.add('error');
@@ -360,39 +360,39 @@ function showResetForm(email, token) {
         </form>
         <div id="resetMessage" class="message"></div>
     `;
-    
+
     document.getElementById('resetPasswordForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        
+
         const newPassword = document.getElementById('newPassword').value;
         const confirmPassword = document.getElementById('confirmPassword').value;
         const email = document.getElementById('resetEmail').value;
         const token = document.getElementById('resetToken').value;
         const messageDiv = document.getElementById('resetMessage');
-        
+
         messageDiv.textContent = '';
         messageDiv.className = 'message';
-        
+
         if (newPassword !== confirmPassword) {
             messageDiv.textContent = 'Passwords do not match';
             messageDiv.classList.add('error');
             return;
         }
-        
+
         try {
             const response = await fetch('/reset-password', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, token, newPassword })
             });
-            
+
             const data = await response.json();
-            
+
             if (response.ok) {
                 messageDiv.textContent = data.message;
                 messageDiv.classList.add('success');
                 setTimeout(() => {
-                    window.location.reload(); 
+                    window.location.reload();
                 }, 2000);
             } else {
                 messageDiv.textContent = data.error;

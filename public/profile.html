@@ -8,6 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/landing.css">
+    <script src="https://cdn.jsdelivr.net/npm/js-cookie@3.0.5/dist/js.cookie.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -335,7 +336,7 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
-            const token = localStorage.getItem('token');
+            const token = Cookies.get('token');
 
             if (!token) {
                 window.location.href = '/login';
@@ -432,7 +433,7 @@
                     showMessage('Account deleted successfully. Redirecting...', 'success');
 
                     // Clear token and redirect
-                    localStorage.removeItem('token');
+                    Cookies.remove('token', { path: '/' });
 
                     setTimeout(() => {
                         window.location.href = '/';
