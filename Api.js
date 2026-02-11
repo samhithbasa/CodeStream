@@ -404,7 +404,9 @@ app.get('/auth/google/callback', async (req, res) => {
             {
                 userId: user._id,
                 email: user.email,
-                isAdmin: ADMIN_EMAILS.includes(user.email) || user.isAdmin === true
+                isAdmin: ADMIN_EMAILS.includes(user.email) || user.isAdmin === true,
+                isGoogleAuth: true,
+                picture: user.picture
             },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
@@ -780,7 +782,9 @@ app.get('/verify-token', authenticateToken, (req, res) => {
         valid: true,
         user: {
             ...req.user,
-            isAdmin: ADMIN_EMAILS.includes(req.user.email) || req.user.isAdmin === true
+            isAdmin: ADMIN_EMAILS.includes(req.user.email) || req.user.isAdmin === true,
+            isGoogleAuth: req.user.isGoogleAuth || false,
+            picture: req.user.picture || null
         }
     });
 });
@@ -805,7 +809,8 @@ app.post('/login', async (req, res) => {
             {
                 userId: user._id,
                 email: user.email,
-                isAdmin: ADMIN_EMAILS.includes(user.email) || user.isAdmin === true
+                isAdmin: ADMIN_EMAILS.includes(user.email) || user.isAdmin === true,
+                isGoogleAuth: false
             },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
@@ -835,24 +840,36 @@ app.delete('/api/delete-account', authenticateToken, async (req, res) => {
         const codes = db.collection('codes');
         const sharedCodes = db.collection('sharedCodes');
 
+        console.log(`[Account Deletion] Attempting to delete user: ${userId}`);
+
         // Get user to verify password
         const user = await users.findOne({ _id: new ObjectId(userId) });
         if (!user) {
+            console.log(`[Account Deletion] User not found: ${userId}`);
             return res.status(404).json({ error: 'User not found' });
         }
 
         // Verify password (skip for Google OAuth users)
-        if (user.loginPassword) {
+        // A user is a Google user if they have googleId and no hashed loginPassword
+        const isGoogleUser = user.googleId && !user.loginPassword;
+
+        if (!isGoogleUser) {
+            console.log(`[Account Deletion] Standard user verification for: ${user.email}`);
             if (!password) {
                 return res.status(400).json({ error: 'Password required for account deletion' });
             }
             const isMatch = await bcrypt.compare(password, user.loginPassword);
             if (!isMatch) {
+                console.log(`[Account Deletion] Incorrect password for: ${user.email}`);
                 return res.status(401).json({ error: 'Incorrect password' });
             }
+        } else {
+            console.log(`[Account Deletion] Google OAuth user verification (password skip) for: ${user.email}`);
         }
 
         // Delete all user data
+        console.log(`[Account Deletion] Deleting data for user: ${userId}`);
+
         // 1. Delete saved codes
         await codes.deleteMany({ userId: userId.toString() });
 
@@ -863,23 +880,26 @@ app.delete('/api/delete-account', authenticateToken, async (req, res) => {
         const frontendProjectsPath = path.join(__dirname, 'frontend_projects', userId.toString());
         if (fs.existsSync(frontendProjectsPath)) {
             fs.rmSync(frontendProjectsPath, { recursive: true, force: true });
+            console.log(`[Account Deletion] Removed frontend projects directory: ${frontendProjectsPath}`);
         }
 
         // 4. Delete saved code files
         const savedCodesPath = path.join(__dirname, 'saved_codes', userId.toString());
         if (fs.existsSync(savedCodesPath)) {
             fs.rmSync(savedCodesPath, { recursive: true, force: true });
+            console.log(`[Account Deletion] Removed saved codes directory: ${savedCodesPath}`);
         }
 
-        // 5. Delete user account
-        await users.deleteOne({ _id: new ObjectId(userId) });
+        // 5. Delete user account from database
+        const deleteResult = await users.deleteOne({ _id: new ObjectId(userId) });
+        console.log(`[Account Deletion] User record deleted: ${deleteResult.deletedCount}`);
 
         res.json({
             message: 'Account and all associated data deleted successfully',
             success: true
         });
     } catch (error) {
-        console.error('Account deletion error:', error);
+        console.error('[Account Deletion] ERROR:', error);
         res.status(500).json({ error: 'Failed to delete account' });
     }
 });

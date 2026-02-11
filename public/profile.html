@@ -57,12 +57,34 @@
             color: white;
             font-size: 2rem;
             font-weight: 600;
+            overflow: hidden;
+            border: 4px solid white;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            cursor: pointer;
+        }
+
+        .profile-avatar:hover {
+            transform: scale(1.1) rotate(5deg);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+        }
+
+        .profile-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
         }
 
         .profile-info h1 {
             color: #2d3748;
             font-size: 1.8rem;
             margin-bottom: 0.5rem;
+            background: linear-gradient(to right, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 700;
         }
 
         .profile-info p {
@@ -224,9 +246,23 @@
 
         .message {
             padding: 1rem;
-            border-radius: 10px;
-            margin-bottom: 1rem;
+            border-radius: 12px;
+            margin-bottom: 1.5rem;
             display: none;
+            animation: slideDown 0.4s ease-out;
+            font-weight: 500;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .message.success {
@@ -362,15 +398,22 @@
                 document.getElementById('user-email').textContent = user.email;
                 document.getElementById('email-display').textContent = user.email;
 
-                // Set avatar initial
-                const initial = user.email.charAt(0).toUpperCase();
-                document.getElementById('avatar').textContent = initial;
+                // Handle Avatar / Profile Picture
+                const avatarContainer = document.getElementById('avatar');
+                if (user.picture) {
+                    avatarContainer.innerHTML = `<img src="${user.picture}" alt="Profile Picture">`;
+                } else {
+                    avatarContainer.innerHTML = `<img src="images/user-icon.png" alt="User Icon" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(user.email)}&background=random'">`;
+                }
 
-                // Check if Google OAuth user
-                const isGoogleUser = user.email && !user.loginPassword;
-                if (isGoogleUser) {
-                    document.getElementById('account-type').textContent = 'Google OAuth';
+                // Display Account Type
+                const accountTypeElement = document.getElementById('account-type');
+                if (user.isGoogleAuth) {
+                    accountTypeElement.textContent = 'Google OAuth';
                     document.getElementById('password-group').style.display = 'none';
+                } else {
+                    accountTypeElement.textContent = 'Standard';
+                    document.getElementById('password-group').style.display = 'block';
                 }
 
             } catch (error) {
