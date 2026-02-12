@@ -95,6 +95,7 @@
             cursorBlink: true,
             fontSize: 14,
             fontFamily: 'Consolas, "Liberation Mono", Menlo, Courier, monospace',
+            convertEol: true,
             theme: {
                 background: '#1e1e1e',
                 foreground: '#ffffff',
@@ -549,9 +550,14 @@
                         case 'output':
                             term.write(message.data);
                             // If we see output with prompts, the program is ready for input
-                            if (message.data.includes('Enter') || message.data.includes(':')) {
+                            if (message.data.includes('?') || message.data.includes('Enter') || message.data.includes(':')) {
                                 isProcessReady = true;
-                                term.write('\r\n\x1b[36m● Type your input and press ENTER: \x1b[0m');
+                                // Only add a small indicator instead of a full new line and long text
+                                if (!message.data.includes('\n')) {
+                                    term.write(' \x1b[36m➤ \x1b[0m');
+                                } else {
+                                    term.write('\x1b[36m➤ \x1b[0m');
+                                }
                             }
                             break;
 
