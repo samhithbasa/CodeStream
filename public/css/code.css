@@ -1351,7 +1351,7 @@ section .icons img:hover {
     }
 
     section .icons {
-        order: 3;
+        order: 1;
         flex-direction: row;
         height: 70px;
         width: 100%;
@@ -1359,10 +1359,11 @@ section .icons img:hover {
         justify-content: center;
         gap: 20px;
         border-right: none;
-        border-top: 1px solid rgba(0, 212, 255, 0.2);
+        border-bottom: 1px solid rgba(0, 212, 255, 0.2);
         background: var(--header-bg);
         overflow: hidden;
     }
+
 
     section .icons img {
         height: 40px;
