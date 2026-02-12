@@ -24,24 +24,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            // We need the email associated with the token to call the backend /reset-password
-            // However, the backend expects { email, token, newPassword }
-            // Let's decode the token to get the email if possible, or just send the token.
-            // Wait, looking at Api.js lines 972-985, the backend expects 'email' in the body.
-            // Let's decode the JWT to get the email.
-
-            const payload = JSON.parse(atob(token.split('.')[1]));
-            const email = payload.email;
-
-            if (!email) {
-                showMessage('Malformed token. Please request a new link.', 'error');
-                return;
-            }
-
             const response = await fetch('/reset-password', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, token, newPassword })
+                body: JSON.stringify({ token, newPassword })
             });
 
             const data = await response.json();
@@ -54,6 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 showMessage(data.error || 'Failed to reset password.', 'error');
             }
+
         } catch (error) {
             console.error('Reset password error:', error);
             showMessage('Network error. Please try again.', 'error');

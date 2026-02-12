@@ -961,23 +961,26 @@ app.post('/forgot-password', passwordResetLimiter, async (req, res) => {
 
 app.post('/reset-password', async (req, res) => {
     try {
-        const { email, token, newPassword } = req.body;
+        const { token, newPassword } = req.body;
         const db = getDb();
         const users = db.collection('users');
         const passwordResets = db.collection('passwordResets');
 
-        if (!email || !token || !newPassword) {
-            return res.status(400).json({ error: 'All fields are required' });
+        if (!token || !newPassword) {
+            return res.status(400).json({ error: 'New password and token are required' });
         }
 
         if (newPassword.length < 8) {
             return res.status(400).json({ error: 'Password must be at least 8 characters' });
         }
 
-        const resetRecord = await passwordResets.findOne({ email, token });
+        // Find the reset record by token only
+        const resetRecord = await passwordResets.findOne({ token });
         if (!resetRecord) {
             return res.status(400).json({ error: 'Invalid or expired token' });
         }
+
+        const email = resetRecord.email;
 
         try {
             jwt.verify(token, process.env.JWT_SECRET);
@@ -1000,6 +1003,7 @@ app.post('/reset-password', async (req, res) => {
         res.status(500).json({ error: 'Failed to reset password' });
     }
 });
+
 
 app.post('/logout', authenticateToken, (req, res) => {
     res.json({
