@@ -1350,29 +1350,31 @@ section .icons img:hover {
         height: calc(100vh - 100px);
     }
 
-    .icons {
+    section .icons {
         order: 3;
         flex-direction: row;
-        height: 80px;
+        height: 70px;
         width: 100%;
-        padding: 10px;
+        padding: 5px;
         justify-content: center;
-        gap: 30px;
+        gap: 20px;
         border-right: none;
         border-top: 1px solid rgba(0, 212, 255, 0.2);
         background: var(--header-bg);
+        overflow: hidden;
     }
 
-    .icons img {
+    section .icons img {
         height: 40px;
         width: 40px;
         margin: 0;
+        filter: grayscale(0%) brightness(1.2);
     }
 
     .code-editor,
     .preview {
         width: 100%;
-        height: calc(50% - 40px);
+        height: calc(50% - 35px);
         border-left: none;
         flex: none;
     }
@@ -1407,12 +1409,12 @@ section .icons img:hover {
         height: calc(100vh - 120px);
     }
 
-    .icons {
-        height: 70px;
-        gap: 20px;
+    section .icons {
+        height: 60px;
+        gap: 15px;
     }
 
-    .icons img {
+    section .icons img {
         height: 35px;
         width: 35px;
     }

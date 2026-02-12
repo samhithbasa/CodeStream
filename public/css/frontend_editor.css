@@ -907,6 +907,9 @@ body {
         flex-direction: column;
         align-items: flex-start;
         gap: 10px;
+        position: relative;
+        z-index: 2000;
+        /* Stay above preview panel */
     }
 
     .header-left h1 {
@@ -937,6 +940,7 @@ body {
     .container {
         flex-direction: column;
         height: calc(100vh - 120px);
+        position: relative;
     }
 
     .editor-tabs {
@@ -952,12 +956,12 @@ body {
     }
 
     .live-preview-panel {
+        position: absolute;
+        top: 0;
+        left: 0;
         width: 100%;
-        height: calc(100vh - 120px);
-        top: auto;
-        bottom: 0;
-        z-index: 500;
-        box-shadow: 0 -5px 15px rgba(0, 0, 0, 0.4);
+        height: 100%;
+        z-index: 1500;
     }
 }
 
