@@ -1351,7 +1351,8 @@ section .icons img:hover {
     }
 
     section .icons {
-        order: 3;
+        order: 1;
+        /* Move below header */
         flex-direction: row;
         height: 70px;
         width: 100%;
@@ -1359,7 +1360,8 @@ section .icons img:hover {
         justify-content: center;
         gap: 20px;
         border-right: none;
-        border-top: 1px solid rgba(0, 212, 255, 0.2);
+        border-bottom: 2px solid rgba(0, 212, 255, 0.3);
+        /* Border below icons */
         background: var(--header-bg);
         overflow: hidden;
     }
@@ -1371,8 +1373,8 @@ section .icons img:hover {
         filter: grayscale(0%) brightness(1.2);
     }
 
-    .code-editor,
-    .preview {
+    .code-editor {
+        order: 2;
         width: 100%;
         height: calc(50% - 35px);
         border-left: none;
@@ -1380,8 +1382,12 @@ section .icons img:hover {
     }
 
     .preview {
-        border-top: 1px solid rgba(0, 212, 255, 0.2);
+        order: 3;
+        width: 100%;
+        height: calc(50% - 35px);
+        border-top: 2px solid rgba(0, 212, 255, 0.3);
         padding: 10px;
+        flex: none;
     }
 
     header {
