@@ -60,16 +60,19 @@ body {
 
 /* Contact Cards */
 .contact-methods {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    display: flex;
+    justify-content: center;
     gap: 2rem;
     margin: 3rem 0;
+    flex-wrap: wrap;
 }
 
 .contact-card {
     padding: 2rem;
     background: rgba(255, 255, 255, 0.9);
     border-radius: var(--border-radius);
+    max-width: 450px;
+    width: 100%;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
     text-align: center;
     transition: var(--transition);
@@ -340,8 +343,13 @@ button:disabled:hover {
 }
 
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 /* Responsive Design */
@@ -349,16 +357,16 @@ button:disabled:hover {
     .form-grid {
         grid-template-columns: 1fr;
     }
-    
+
     .form-group.full-width {
         grid-column: span 1;
     }
-    
+
     .contact-container {
         margin: 2rem auto;
         padding: 1.5rem;
     }
-    
+
     .contact-header h1 {
         font-size: 2rem;
     }
@@ -368,7 +376,7 @@ button:disabled:hover {
     .contact-methods {
         grid-template-columns: 1fr;
     }
-    
+
     .contact-form {
         padding: 1.5rem;
     }
