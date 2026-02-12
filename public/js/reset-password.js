@@ -47,9 +47,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
 
             if (response.ok) {
-                showMessage('Password updated successfully! Redirecting to login...', 'success');
+                showMessage('Password updated successfully! Redirecting...', 'success');
                 setTimeout(() => {
-                    window.location.href = '/login.html';
+                    window.location.href = '/reset-success.html';
                 }, 2000);
             } else {
                 showMessage(data.error || 'Failed to reset password.', 'error');
