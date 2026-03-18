@@ -212,46 +212,31 @@ async function sendEmailResend(to, subject, htmlContent) {
 }
 
 async function sendEmailGmail(to, subject, htmlContent) {
-    const clientId = process.env.GOOGLE_CLIENT_ID;
-    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
     const userEmail = process.env.EMAIL_USER;
+    const userPass = process.env.EMAIL_PASS;
 
-    if (!clientId || !clientSecret || !refreshToken || !userEmail) {
-        throw new Error('Gmail API credentials (ID, Secret, Refresh Token, or EMAIL_USER) are missing');
+    if (!userEmail || !userPass) {
+        throw new Error('Gmail credentials (EMAIL_USER or EMAIL_PASS) are missing');
     }
 
-    const auth = new google.auth.OAuth2(clientId, clientSecret);
-    auth.setCredentials({ refresh_token: refreshToken });
+    const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+            user: userEmail,
+            pass: userPass
+        }
+    });
 
-    const gmail = google.gmail({ version: 'v1', auth });
-
-    // Create RFC822 compliant email
-    const utf8Subject = `=?utf-8?B?${Buffer.from(subject).toString('base64')}?=`;
-    const messageParts = [
-        `From: Code Editor <${userEmail}>`,
-        `To: ${to}`,
-        `Content-Type: text/html; charset=utf-8`,
-        `MIME-Version: 1.0`,
-        `Subject: ${utf8Subject}`,
-        '',
-        htmlContent,
-    ];
-    const message = messageParts.join('\n');
-
-    // The body needs to be base64url encoded
-    const encodedMessage = Buffer.from(message)
-        .toString('base64')
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '');
+    const mailOptions = {
+        from: `"Code Editor" <${userEmail}>`,
+        to: to,
+        subject: subject,
+        html: htmlContent
+    };
 
     try {
-        const res = await gmail.users.messages.send({
-            userId: 'me',
-            requestBody: { raw: encodedMessage },
-        });
-        return res.data;
+        const info = await transporter.sendMail(mailOptions);
+        return info;
     } catch (error) {
         throw new Error(`Gmail API error: ${error.message}`);
     }

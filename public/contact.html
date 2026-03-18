@@ -64,7 +64,7 @@
                 <div class="form-group">
                     <label for="email">Email Address</label>
                     <input type="email" id="email" name="email" placeholder="john@gmail.com" required
-                        pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
+                        pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}"
                         title="Enter a valid email (e.g. name@gmail.com)" />
                     <span class="error-message" id="email-error"></span>
                 </div>
@@ -95,7 +95,7 @@
                         I agree to the <a href="/privacy" target="_blank">privacy policy</a> and consent to my data
                         being processed.
                     </label>
-                    <span class="error-message" id="consent-error"></span>
+                    <span class="error-message" id="consent-checkbox-error"></span>
                 </div>
 
                 <div class="form-group full-width">
@@ -135,7 +135,7 @@
                 inputs.forEach(input => {
                     if (!input.checkValidity()) {
                         input.classList.add('invalid');
-                        const errorId = `${input.id}-error` || 'consent-error';
+                        const errorId = `${input.id}-error`;
                         document.getElementById(errorId).textContent = getValidationMessage(input);
                         isValid = false;
                     }
