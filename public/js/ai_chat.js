@@ -15,28 +15,49 @@ document.addEventListener('DOMContentLoaded', () => {
     // Function to parse naive markdown manually to HTML and inject Accept/Reject UI
     let codeBlockIdCount = 0;
     function parseMarkdown(md) {
-        let html = md.replace(/```([\w]*)\n([\s\S]*?)```/g, (match, lang, code) => {
+        const codeBlocks = [];
+
+        // 1. Extract and protect code blocks
+        let html = md.replace(/```([a-zA-Z0-9+#-]*)\n([\s\S]*?)```/g, (match, lang, code) => {
             codeBlockIdCount++;
-            const rawCode = code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
             const safeCodeId = `ai-code-block-${Date.now()}-${codeBlockIdCount}`;
-            
-            return `
-            <div class="ai-code-container" id="container-${safeCodeId}">
-                <div class="ai-code-header">${lang || 'code'}</div>
-                <pre><code>${rawCode}</code></pre>
-                <textarea id="raw-${safeCodeId}" style="display: none;">${code}</textarea>
-                <div class="ai-code-actions">
-                    <button class="ai-btn-action ai-btn-accept" onclick="acceptAICode('${safeCodeId}', '${lang}')">✓ Accept</button>
-                    <button class="ai-btn-action ai-btn-reject" onclick="rejectAICode('${safeCodeId}')">✕ Reject</button>
-                </div>
-            </div>`;
+            codeBlocks.push({ id: safeCodeId, lang: lang, code: code });
+            return `%%CODE_BLOCK_${safeCodeId}%%`;
         });
         
-        // Handle blocks without language specified nicely
-        html = html.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+        // Handle blocks without language specified
+        html = html.replace(/```([\s\S]*?)```/g, (match, code) => {
+            codeBlockIdCount++;
+            const safeCodeId = `ai-code-block-${Date.now()}-${codeBlockIdCount}`;
+            codeBlocks.push({ id: safeCodeId, lang: '', code: code });
+            return `%%CODE_BLOCK_${safeCodeId}%%`;
+        });
+
+        // 2. Perform text formatting safely
         html = html.replace(/`([^`]+)`/g, '<code style="background: rgba(0,0,0,0.2); padding: 2px 4px; border-radius: 3px;">$1</code>');
         html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
         html = html.replace(/\n\n/g, '<br><br>');
+
+        // 3. Inject code blocks back into the HTML
+        codeBlocks.forEach(block => {
+            const rawCodeDisplay = block.code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            // Also escape it for the textarea value
+            const rawCodeValue = block.code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+            const blockHtml = `
+            <div class="ai-code-container" id="container-${block.id}">
+                <div class="ai-code-header">${block.lang || 'code'}</div>
+                <pre><code>${rawCodeDisplay}</code></pre>
+                <textarea id="raw-${block.id}" style="display: none;">${rawCodeValue}</textarea>
+                <div class="ai-code-actions">
+                    <button class="ai-btn-action ai-btn-accept" onclick="acceptAICode('${block.id}', '${block.lang}')">✓ Accept</button>
+                    <button class="ai-btn-action ai-btn-reject" onclick="rejectAICode('${block.id}')">✕ Reject</button>
+                </div>
+            </div>`;
+            
+            html = html.replace(`%%CODE_BLOCK_${block.id}%%`, blockHtml);
+        });
+
         return html;
     }
 
