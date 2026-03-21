@@ -166,3 +166,73 @@
 .ai-message.ai-system p { margin: 0 0 10px 0; }
 .ai-message.ai-system p:last-child { margin: 0; }
 .ai-message.ai-system ul, .ai-message.ai-system ol { margin: 0 0 10px 20px; padding: 0; }
+
+/* AI Inline Code Accept/Reject Styles */
+.ai-code-container {
+    background: #1e1e1e;
+    border-radius: 6px;
+    margin: 8px 0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+}
+
+.ai-code-header {
+    font-size: 0.75rem;
+    color: #888;
+    padding: 4px 10px;
+    background: #252526;
+    text-transform: uppercase;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+}
+
+.ai-code-container pre {
+    margin: 0;
+    padding: 10px;
+    background: transparent;
+    border-radius: 0;
+}
+
+.ai-code-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.ai-btn-action {
+    border: none;
+    padding: 5px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.ai-btn-accept {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+}
+
+.ai-btn-accept:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(16, 185, 129, 0.3);
+}
+
+.ai-btn-reject {
+    background: rgba(255, 255, 255, 0.1);
+    color: #e0e0e0;
+}
+
+.ai-btn-reject:hover {
+    background: rgba(239, 68, 68, 0.8);
+    color: white;
+}
+
+.ai-btn-rejected {
+    opacity: 0.4;
+    pointer-events: none;
+}
