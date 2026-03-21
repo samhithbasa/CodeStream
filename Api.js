@@ -19,6 +19,7 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const { google } = require('googleapis');
 const url = require('url');
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const app = express();
 app.set('trust proxy', 1);
@@ -2872,6 +2873,64 @@ wss.on('connection', (ws) => {
             }
         });
         tempFiles = [];
+    }
+});
+
+// AI Provider Setup
+let currentGeminiKeyIndex = 0;
+function getNextGeminiKey() {
+    const keysString = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || '';
+    if (!keysString) return null;
+    const keys = keysString.split(',').map(k => k.trim()).filter(k => k);
+    if (keys.length === 0) return null;
+    
+    // Round-robin rotation
+    const key = keys[currentGeminiKeyIndex];
+    currentGeminiKeyIndex = (currentGeminiKeyIndex + 1) % keys.length;
+    console.log(`[AI] Using API Key index: ${currentGeminiKeyIndex === 0 ? keys.length - 1 : currentGeminiKeyIndex - 1}`);
+    return key;
+}
+
+app.post('/api/ai/generate', async (req, res) => {
+    // Note: Can add authenticateToken middleware here if we want to restrict AI to logged-in users.
+    // For now, allowing open access or handling auth on frontend since playgrounds might be open.
+    try {
+        const { prompt, context, mode } = req.body;
+        
+        const apiKey = getNextGeminiKey();
+        if (!apiKey) {
+            return res.status(500).json({ error: 'AI capabilities are not configured (Missing API Key in .env)' });
+        }
+
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+        let systemInstruction = "";
+        if (mode === 'frontend') {
+            systemInstruction = "You are an expert frontend developer AI assistant directly integrated into a Web Playground. The user will provide their current HTML, CSS, and JS code as context. Answer their questions, provide UI/UX improvements, or generate code. Return code wrapped in markdown blocks.";
+        } else {
+            systemInstruction = "You are an expert software engineer AI assistant directly integrated into an IDE. The user will provide their current C, C++, Java, Python, or JS code as context. Answer their questions, debug their code, or write code for them. Return code wrapped in markdown blocks.";
+        }
+
+        const fullPrompt = `${systemInstruction}\n\nCURRENT CODE CONTEXT:\n${context || 'No code provided.'}\n\nUSER PROMPT:\n${prompt}`;
+
+        const result = await model.generateContent(fullPrompt);
+        const response = await result.response;
+        const text = response.text();
+
+        res.json({ success: true, answer: text });
+    } catch (error) {
+        console.error('AI Generation Error:', error);
+        
+        // Format the error nicely for the frontend chat UI
+        let errorMessage = 'Failed to generate AI response. ';
+        if (error.status === 429) {
+            errorMessage = 'API Rate limit exceeded. The keys might be exhausted. Try again in a minute.';
+        } else if (error.message) {
+            errorMessage += error.message;
+        }
+
+        res.status(500).json({ error: errorMessage });
     }
 });
 

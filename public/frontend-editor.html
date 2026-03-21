@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Simple Web Playground</title>
     <link rel="stylesheet" href="/css/frontend_editor.css">
+    <link rel="stylesheet" href="/css/ai_chat.css">
     <script src="https://cdn.jsdelivr.net/npm/js-cookie@3.0.5/dist/js.cookie.min.js"></script>
 </head>
 
@@ -23,6 +24,7 @@
             <button id="save-project" class="btn btn-primary">
                 💾 Save & Deploy
             </button>
+            <button id="ai-assistant-btn" class="btn" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; font-weight: bold; margin-right: 10px;">✨ AI Assistant</button>
             <button id="theme-toggle" class="btn btn-secondary">🌙 Toggle Theme</button>
 
             <!-- Dynamic Login/Logout Toggle Button -->
@@ -170,6 +172,22 @@ document.addEventListener('DOMContentLoaded', function() {
         <span>✓</span> Project saved successfully! Share URL copied to clipboard.
     </div>
 
+    <!-- AI Assistant Panel -->
+    <div id="ai-panel" class="ai-panel">
+        <div class="ai-header">
+            <h3>✨ AI Assistant</h3>
+            <button id="close-ai" class="ai-close-btn">&times;</button>
+        </div>
+        <div class="ai-chat-box" id="ai-chat-box">
+            <div class="ai-message ai-system">Hello! I am your AI Developer Assistant. How can I help you with your UI/UX or logic today?</div>
+        </div>
+        <div class="ai-input-area">
+            <textarea id="ai-prompt" placeholder="Ask me to generate a beautiful button, fix CSS, or write logic..." rows="2"></textarea>
+            <button id="send-ai-btn" class="ai-send-btn">Send</button>
+        </div>
+    </div>
+
+    <script src="/js/ai_chat.js"></script>
     <script>
         console.log('=== DEBUG: Token handler script loaded ===');
 

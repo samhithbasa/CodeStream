@@ -23,6 +23,7 @@
     <link rel="stylesheet" href="https://unpkg.com/xterm/css/xterm.css">
     <script src="https://unpkg.com/xterm/lib/xterm.js"></script>
     <script src="https://unpkg.com/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
+    <link rel="stylesheet" href="css/ai_chat.css">
 </head>
 
 <body>
@@ -36,6 +37,7 @@
             <div id="saved-codes-popup">
                 <ul id="saved-code-list"></ul>
             </div>
+            <button class="cm-solarized-btn" id="ai-assistant-btn" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; margin-right: 10px; font-weight: bold;">✨ Ask AI</button>
             <button class="cm-solarized-btn cm-solarized-btn-logout" id="logout-button">Logout</button>
             <img src="images/moon.png" id="moon">
         </div>
@@ -80,6 +82,22 @@
         </div>
     </div>
 
+    <!-- AI Assistant Panel -->
+    <div id="ai-panel" class="ai-panel">
+        <div class="ai-header">
+            <h3>✨ AI Assistant</h3>
+            <button id="close-ai" class="ai-close-btn">&times;</button>
+        </div>
+        <div class="ai-chat-box" id="ai-chat-box">
+            <div class="ai-message ai-system">Hello! I am your AI Developer Assistant. How can I help you with your code today?</div>
+        </div>
+        <div class="ai-input-area">
+            <textarea id="ai-prompt" placeholder="Ask me to explain, debug, or write code..." rows="2"></textarea>
+            <button id="send-ai-btn" class="ai-send-btn">Send</button>
+        </div>
+    </div>
+
+    <script src="js/ai_chat.js"></script>
     <script>
         const body = document.body;
         const moon = document.getElementById('moon');
