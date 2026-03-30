@@ -175,21 +175,49 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: JSON.stringify({ prompt, context, mode })
                 });
 
-                const data = await response.json();
-                
                 loadingMsg.remove();
 
                 const aiMsg = document.createElement('div');
                 aiMsg.className = 'ai-message ai-system';
-                
-                if (data.success) {
-                    aiMsg.innerHTML = parseMarkdown(data.answer);
-                } else {
-                    aiMsg.textContent = "Error: " + (data.error || "Unknown error occurred.");
-                    aiMsg.style.color = "#ff6b6b";
-                }
-                
                 chatBox.appendChild(aiMsg);
+
+                // Streaming: read as Server-Sent Events
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let rawText = '';
+                let buffer = '';
+
+                while (true) {
+                    const { value, done: readerDone } = await reader.read();
+                    if (readerDone) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // keep incomplete line
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const parsed = JSON.parse(line.slice(6));
+                                if (parsed.token) {
+                                    rawText += parsed.token;
+                                    aiMsg.innerHTML = rawText.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                                    chatBox.scrollTop = chatBox.scrollHeight;
+                                }
+                                if (parsed.done) {
+                                    // Full response received — now render proper parsed markdown
+                                    aiMsg.innerHTML = parseMarkdown(rawText);
+                                    chatBox.scrollTop = chatBox.scrollHeight;
+                                }
+                                if (parsed.error) {
+                                    aiMsg.textContent = "Error: " + parsed.error;
+                                    aiMsg.style.color = "#ff6b6b";
+                                }
+                            } catch (_) {}
+                        }
+                    }
+                }
+
                 chatBox.scrollTop = chatBox.scrollHeight;
 
             } catch (err) {

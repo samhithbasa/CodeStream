@@ -780,6 +780,56 @@ app.get('/verify-token', authenticateToken, (req, res) => {
     });
 });
 
+// Get user statistics for profile dashboard
+app.get('/api/user-stats', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        let codeCount = 0;
+        let projectCount = 0;
+
+        // Count standard code snippets
+        if (fs.existsSync(CODE_STORAGE_DIR)) {
+            const codeFiles = fs.readdirSync(CODE_STORAGE_DIR);
+            codeCount = codeFiles.filter(file => {
+                try {
+                    const data = JSON.parse(fs.readFileSync(path.join(CODE_STORAGE_DIR, file), 'utf8'));
+                    return data.userId === userId;
+                } catch (e) { return false; }
+            }).length;
+        }
+
+        // Count frontend projects
+        if (fs.existsSync(FRONTEND_STORAGE_DIR)) {
+            const projectFiles = fs.readdirSync(FRONTEND_STORAGE_DIR);
+            projectCount = projectFiles.filter(file => {
+                try {
+                    const data = JSON.parse(fs.readFileSync(path.join(FRONTEND_STORAGE_DIR, file), 'utf8'));
+                    return data.userId === userId;
+                } catch (e) { return false; }
+            }).length;
+        }
+
+        // Get user creation date if available from DB
+        const db = getDb();
+        const users = db.collection('users');
+        const user = await users.findOne({ _id: new ObjectId(userId) });
+        const memberSince = user ? user.createdAt : new Date();
+
+        res.json({
+            success: true,
+            stats: {
+                codeCount,
+                projectCount,
+                totalItems: codeCount + projectCount,
+                memberSince: memberSince
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching user stats:', error);
+        res.status(500).json({ error: 'Failed to fetch user statistics' });
+    }
+});
+
 app.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -2892,8 +2942,6 @@ function getNextGeminiKey() {
 }
 
 app.post('/api/ai/generate', async (req, res) => {
-    // Note: Can add authenticateToken middleware here if we want to restrict AI to logged-in users.
-    // For now, allowing open access or handling auth on frontend since playgrounds might be open.
     try {
         const { prompt, context, mode } = req.body;
         
@@ -2914,23 +2962,38 @@ app.post('/api/ai/generate', async (req, res) => {
 
         const fullPrompt = `${systemInstruction}\n\nCURRENT CODE CONTEXT:\n${context || 'No code provided.'}\n\nUSER PROMPT:\n${prompt}`;
 
-        const result = await model.generateContent(fullPrompt);
-        const response = await result.response;
-        const text = response.text();
+        // Set up SSE streaming headers so frontend receives tokens in real-time
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        res.flushHeaders();
 
-        res.json({ success: true, answer: text });
+        const streamResult = await model.generateContentStream(fullPrompt);
+
+        for await (const chunk of streamResult.stream) {
+            const chunkText = chunk.text();
+            if (chunkText) {
+                res.write(`data: ${JSON.stringify({ token: chunkText })}\n\n`);
+            }
+        }
+
+        res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+        res.end();
+
     } catch (error) {
         console.error('AI Generation Error:', error);
-        
-        // Format the error nicely for the frontend chat UI
         let errorMessage = 'Failed to generate AI response. ';
         if (error.status === 429) {
-            errorMessage = 'API Rate limit exceeded. The keys might be exhausted. Try again in a minute.';
+            errorMessage = 'API Rate limit exceeded. Try again in a minute.';
         } else if (error.message) {
             errorMessage += error.message;
         }
-
-        res.status(500).json({ error: errorMessage });
+        if (res.headersSent) {
+            res.write(`data: ${JSON.stringify({ error: errorMessage })}\n\n`);
+            res.end();
+        } else {
+            res.status(500).json({ error: errorMessage });
+        }
     }
 });
 

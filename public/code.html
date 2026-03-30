@@ -24,6 +24,7 @@
     <script src="https://unpkg.com/xterm/lib/xterm.js"></script>
     <script src="https://unpkg.com/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
     <link rel="stylesheet" href="css/ai_chat.css?v=2">
+    <link rel="stylesheet" href="css/toast.css">
 </head>
 
 <body>
@@ -37,6 +38,7 @@
             <div id="saved-codes-popup">
                 <ul id="saved-code-list"></ul>
             </div>
+            <button class="cm-solarized-btn" id="download-btn" title="Download code (Ctrl+D)" style="background:#2d3748; color:#a0aec0; border:none;">⬇ Download</button>
             <button class="cm-solarized-btn" id="ai-assistant-btn" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; margin-right: 10px; font-weight: bold;">✨ Ask AI</button>
             <button class="cm-solarized-btn cm-solarized-btn-logout" id="logout-button">Logout</button>
             <img src="images/moon.png" id="moon">
@@ -98,6 +100,58 @@
     </div>
 
     <script src="js/ai_chat.js?v=2"></script>
+    <script src="js/toast.js"></script>
+    <script>
+        // ⌨️ Keyboard Shortcuts & ⬇️ Download Button Logic
+        document.addEventListener('DOMContentLoaded', () => {
+            // Language extension map for download
+            const extMap = { c: 'c', 'c++': 'cpp', 'c#': 'cs', java: 'java', python: 'py', javascript: 'js', typescript: 'ts' };
+
+            // Download button
+            const downloadBtn = document.getElementById('download-btn');
+            if (downloadBtn) {
+                downloadBtn.addEventListener('click', () => {
+                    if (typeof editor === 'undefined') return;
+                    const code = editor.getValue();
+                    const langEl = document.querySelector('.cm-solarized-btn-primary');
+                    const modeEl = document.querySelector('.CodeMirror');
+                    const modeName = (modeEl?.CodeMirror?.getOption('mode') || 'text').split('/').pop().toLowerCase();
+                    const ext = extMap[modeName] || 'txt';
+                    const fileName = (document.getElementById('code-name')?.value?.trim() || 'code') + '.' + ext;
+                    const blob = new Blob([code], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url; a.download = fileName; a.click();
+                    URL.revokeObjectURL(url);
+                    if (typeof showToast !== 'undefined') showToast('Code downloaded as ' + fileName, 'success');
+                });
+            }
+
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                if (typeof editor === 'undefined') return;
+
+                // Ctrl+Enter = Run
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                    e.preventDefault();
+                    document.getElementById('run-button')?.click();
+                    if (typeof showToast !== 'undefined') showToast('Running code...', 'info', 1500);
+                }
+
+                // Ctrl+S = Save
+                if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                    e.preventDefault();
+                    document.getElementById('save-button')?.click();
+                }
+
+                // Ctrl+D = Download
+                if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+                    e.preventDefault();
+                    document.getElementById('download-btn')?.click();
+                }
+            });
+        });
+    </script>
     <script>
         const body = document.body;
         const moon = document.getElementById('moon');
