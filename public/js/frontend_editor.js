@@ -135,6 +135,40 @@ class SimpleFrontendEditor {
             const saveBtn = document.getElementById('save-project');
             headerRight.insertBefore(showProjectsBtn, saveBtn.nextSibling);
         }
+
+        // Listen for navigation messages from the preview iframe
+        window.addEventListener('message', (e) => {
+            if (e.data && e.data.type === 'NAVIGATE_PREVIEW') {
+                this.handlePreviewNavigation(e.data.fileName);
+            }
+        });
+    }
+
+    handlePreviewNavigation(fileName) {
+        console.log(`[NAVIGATE] Attempting to navigate to: ${fileName}`);
+        const htmlFiles = this.files?.html || {};
+        
+        // Clean the filename (remove leading slash if present)
+        const cleanName = fileName.startsWith('/') ? fileName.substring(1) : fileName;
+        
+        if (htmlFiles[cleanName]) {
+            // Update active file and entry point
+            this.activeFile.html = cleanName;
+            this.entryHtmlFile = cleanName;
+            
+            // Switch to HTML tab
+            this.switchTab('html');
+            
+            // Refresh UI
+            this.refreshFileSelectors();
+            this.syncEditorForType('html');
+            this.updatePreview();
+            
+            console.log(`[NAVIGATE] Successfully navigated to ${cleanName}`);
+        } else {
+            console.warn(`[NAVIGATE] File ${cleanName} not found in project.`);
+            // You could show a 404 in the preview here if you wanted
+        }
     }
 
     setupEditorListeners() {
@@ -667,17 +701,17 @@ class SimpleFrontendEditor {
         const projectName = document.getElementById('project-name')?.value || 'My Project';
         const { html, css, js } = this.getProjectContentSnapshot();
 
-        // 1. Replace relative asset paths in HTML and CSS with absolute URLs
+        // 1. Replace relative asset paths in HTML and CSS
         const processedHTML = this.replaceAssetPaths(html);
         const processedCSS = this.replaceAssetPaths(css);
 
-        // 2. Auto-wrap JavaScript for preview too
+        // 2. Auto-wrap JavaScript
         const processedJS = this.autoWrapJavaScript(js);
 
-        // 3. Determine base URL for relative links (works for saved projects)
+        // 3. Determine base URL for relative links
         let baseTag = '';
         if (this.currentProjectId) {
-            const baseUrl = `http://${window.location.host}/frontend/${this.currentProjectId}/`;
+            const baseUrl = `${window.location.origin}/frontend/${this.currentProjectId}/`;
             baseTag = `<base href="${baseUrl}">`;
         }
 
@@ -695,32 +729,32 @@ class SimpleFrontendEditor {
 <body>
     ${processedHTML}
     <script>
-        // UNIVERSAL PREVIEW - AUTO-WRAPPED
+        // UNIVERSAL PREVIEW SCRIPT
         (function() {
             try {
-                // User's original code
                 ${js}
-                
-                // Auto-wrapped version
                 ${processedJS}
             } catch(error) {
                 console.error('JavaScript error:', error);
             }
             
-            // Universal event handler for preview
+            // Intercept link clicks for multi-page support
             document.addEventListener('click', function(e) {
-                if (e.target.hasAttribute('onclick')) {
-                    const onclick = e.target.getAttribute('onclick');
-                    try {
-                        eval(onclick);
-                    } catch(err) {
-                        console.error('onclick error:', err);
+                const link = e.target.closest('a');
+                if (link && link.getAttribute('href')) {
+                    const href = link.getAttribute('href');
+                    
+                    // If it's a relative link to another HTML file in the project
+                    if (!href.startsWith('http') && !href.startsWith('//') && (href.endsWith('.html') || !href.includes('.'))) {
+                        e.preventDefault();
+                        window.parent.postMessage({
+                            type: 'NAVIGATE_PREVIEW',
+                            fileName: href.includes('.') ? href : href + '.html'
+                        }, '*');
                     }
                 }
             });
         })();
-        
-        console.log('Preview loaded');
     </script>
 </body>
 </html>`;

@@ -1575,14 +1575,10 @@ function replaceAssetPaths(content, assets, host) {
     return processed;
 }
 
-function generateDeployedHTML(projectData, req = null) {
-    // If project has deploymentHTML, use it
-    if (projectData.deploymentHTML) {
-        console.log('[DEBUG] Using pre-generated deployment HTML');
-        return projectData.deploymentHTML;
-    }
-
-    console.log('[DEBUG] Generating universal deployment HTML');
+function generateDeployedHTML(projectData, req = null, requestedFile = 'index.html') {
+    // If exact deploymentHTML exists for this specific path, we could use it (but usually we re-generate)
+    
+    console.log(`[DEBUG] Generating deployment HTML for: ${requestedFile}`);
 
     const { files, name, assets } = projectData;
     const host = req ? req.headers.host : 'localhost:3000';
@@ -1592,18 +1588,15 @@ function generateDeployedHTML(projectData, req = null) {
     const cssFiles = safeFiles.css || {};
     const jsFiles = safeFiles.js || {};
 
-    // Choose entry HTML file: explicit index.html, otherwise first available
-    let entryHtmlName = null;
-    if (htmlFiles['index.html']) {
-        entryHtmlName = 'index.html';
+    // Choose the HTML content
+    let htmlContent = '';
+    if (htmlFiles[requestedFile]) {
+        htmlContent = replaceAssetPaths(htmlFiles[requestedFile], assets, host);
     } else {
-        const htmlNames = Object.keys(htmlFiles);
-        if (htmlNames.length > 0) {
-            entryHtmlName = htmlNames[0];
-        }
+        // Fallback to first available if requested doesn't exist
+        const firstHtml = Object.keys(htmlFiles)[0];
+        htmlContent = firstHtml ? replaceAssetPaths(htmlFiles[firstHtml], assets, host) : '<h1>Page Not Found</h1>';
     }
-
-    const htmlContent = entryHtmlName ? replaceAssetPaths(htmlFiles[entryHtmlName] || '', assets, host) : '<h1>Project</h1>';
 
     const cssContent = replaceAssetPaths(Object.entries(cssFiles).map(([name, content]) =>
         `/* ${name} */\n${content || ''}`
@@ -1976,61 +1969,54 @@ app.delete('/api/frontend/asset/:assetId', authenticateToken, async (req, res) =
     }
 });
 
-app.get('/frontend/:id', (req, res) => {
+app.get('/frontend/:id/:fileName(*)?', (req, res) => {
     try {
         const projectId = req.params.id;
+        const requestedFile = req.params.fileName || 'index.html';
 
-        // Handle .js, .css, .html file requests
-        if (projectId.endsWith('.js') || projectId.endsWith('.css') || projectId.endsWith('.html')) {
-            // Extract the actual project ID from the filename
-            const actualProjectId = projectId.split('.')[0];
-            const filePath = path.join(FRONTEND_STORAGE_DIR, `${actualProjectId}.json`);
-
-            if (!fs.existsSync(filePath)) {
-                return res.status(404).send('Project not found');
-            }
-
-            const projectData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-
-            // Check which file type is requested
-            if (projectId.endsWith('.js')) {
-                res.setHeader('Content-Type', 'application/javascript');
-                return res.send(projectData.files?.js?.['script.js'] || '');
-            } else if (projectId.endsWith('.css')) {
-                res.setHeader('Content-Type', 'text/css');
-                return res.send(projectData.files?.css?.['style.css'] || '');
-            } else if (projectId.endsWith('.html')) {
-                res.setHeader('Content-Type', 'text/html');
-                return res.send(projectData.files?.html?.['index.html'] || '');
-            }
-        }
-
-        // Handle regular project ID
+        // Check if project exists
         const projectPath = path.join(FRONTEND_STORAGE_DIR, `${projectId}.json`);
-
         if (!fs.existsSync(projectPath)) {
-            return res.status(404).send(`
-                <html>
-                    <body>
-                        <h1>Project Not Found</h1>
-                        <p>The requested project does not exist.</p>
-                    </body>
-                </html>
-            `);
+            return res.status(404).send('Project not found');
         }
 
         const projectData = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
+        const { files } = projectData;
 
-        // Use deploymentHTML if it exists, but regenerate to include latest assets
-        if (projectData.deploymentHTML && (!projectData.assets || projectData.assets.length === 0)) {
-            res.setHeader('Content-Type', 'text/html');
-            return res.send(projectData.deploymentHTML);
+        // Determine content type
+        let contentType = 'text/html';
+        let fileCategory = 'html';
+        
+        if (requestedFile.endsWith('.js')) {
+            contentType = 'application/javascript';
+            fileCategory = 'js';
+        } else if (requestedFile.endsWith('.css')) {
+            contentType = 'text/css';
+            fileCategory = 'css';
         }
 
-        // Generate HTML with assets included
-        const simpleHTML = generateDeployedHTML(projectData, req);
+        // Search for the file in the project
+        const categoryFiles = files?.[fileCategory] || {};
+        const fileContent = categoryFiles[requestedFile];
+
+        if (fileContent !== undefined) {
+            res.setHeader('Content-Type', contentType);
+            if (fileCategory === 'html') {
+                const finalHTML = generateDeployedHTML(projectData, req, requestedFile);
+                return res.send(finalHTML);
+            }
+            return res.send(fileContent);
+        }
+
+        // If specific file was requested but not found
+        if (req.params.fileName && req.params.fileName !== '/') {
+            return res.status(404).send('File not found in project');
+        }
+
+        // Fallback to entry point
+        const entryHTML = generateDeployedHTML(projectData, req, 'index.html');
         res.setHeader('Content-Type', 'text/html');
-        res.send(simpleHTML);
+        res.send(entryHTML);
 
     } catch (error) {
         console.error('Error serving project:', error);
@@ -2955,9 +2941,29 @@ app.post('/api/ai/generate', async (req, res) => {
 
         let systemInstruction = "";
         if (mode === 'frontend') {
-            systemInstruction = "You are an expert frontend developer AI assistant directly integrated into a Web Playground. The user will provide their current HTML, CSS, and JS code as context. Answer their questions, provide UI/UX improvements, or generate code. Return code wrapped in markdown blocks.";
+            systemInstruction = `You are a world-class Frontend Developer AI. You are integrated into a Web Playground where users can create HTML, CSS, and JS.
+            
+            STRICT RULES:
+            1. PAGING LOGIC: 
+               - If the user asks for a "single page", "landing page", "portfolio", or doesn't specify multiple pages, generate ONLY ONE HTML file (usually index.html). 
+               - Do NOT include navigation links to 'About', 'Contact', or 'Login' unless the user explicitly requested those separate pages.
+               - If the user explicitly asks for a "multiple pages" or "multi-page" site, then you may generate navigation links and the corresponding code for those pages.
+            
+            2. CODE STYLE:
+               - Use modern, premium CSS (Flexbox/Grid, gradients, smooth transitions, Outfit/Inter fonts).
+               - Avoid generic designs; aim for a professional, "SaaS-like" aesthetic.
+            
+            3. OUTPUT FORMAT:
+               - Always wrap code in markdown blocks with the filename as a comment at the top, e.g., <!-- index.html -->.
+               - Be concise but helpful.`;
         } else {
-            systemInstruction = "You are an expert software engineer AI assistant directly integrated into an IDE. The user will provide their current C, C++, Java, Python, or JS code as context. Answer their questions, debug their code, or write code for them. Return code wrapped in markdown blocks.";
+            systemInstruction = `You are a Senior Software Engineer AI. You are integrated into a multi-language IDE.
+            
+            STRICT RULES:
+            1. Analyze the context provided to understand the user's goals.
+            2. Provide high-quality, documented, and bug-free code in C, C++, Java, Python, or JS.
+            3. If debugging, explain the cause of the error clearly and provide the fixed code.
+            4. Wrap all code in markdown blocks.`;
         }
 
         const fullPrompt = `${systemInstruction}\n\nCURRENT CODE CONTEXT:\n${context || 'No code provided.'}\n\nUSER PROMPT:\n${prompt}`;
