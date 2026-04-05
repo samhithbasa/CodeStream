@@ -162,9 +162,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Append loading indicator
             const loadingMsg = document.createElement('div');
-            loadingMsg.className = 'ai-loader';
-            loadingMsg.style.display = 'block';
-            loadingMsg.textContent = 'AI is thinking...';
+            loadingMsg.className = 'ai-loader typing-indicator';
+            loadingMsg.style.display = 'flex';
+            loadingMsg.innerHTML = '<span></span><span></span><span></span>';
             chatBox.appendChild(loadingMsg);
             chatBox.scrollTop = chatBox.scrollHeight;
 

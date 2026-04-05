@@ -54,7 +54,7 @@
 }
 
 body {
-    font-family: 'Fira Code', 'JetBrains Mono', 'Courier New', monospace;
+    font-family: 'Outfit', sans-serif;
     background-color: var(--bg-color);
     color: var(--text-color);
     height: 100vh;
@@ -67,15 +67,18 @@ body {
 /* ===== Header Styles ===== */
 header {
     position: relative;
-    height: 15%;
+    height: 70px;
     width: 100%;
     display: flex;
     align-items: center;
     justify-content: space-between;
     background-color: var(--header-bg);
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-    padding: 0 20px;
-    border-bottom: 1px solid var(--glass-border);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+    padding: 0 24px;
+    border-bottom: 1px solid var(--border-color);
+    z-index: 1000;
 }
 
 header #logo {
