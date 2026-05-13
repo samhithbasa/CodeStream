@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     const registerForm = document.getElementById('registerForm');
     const emailInput = document.getElementById('email');
-    const passwordInput = document.getElementById('password');
+    // Removed dead passwordInput reference
     const otpSection = document.getElementById('otpSection');
     const otpInput = document.getElementById('otp');
     const getOtpBtn = document.getElementById('getOtp');
@@ -51,16 +51,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const isValidEmail = (value) => /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(value);
 
+    // Prevent form from reloading page when Enter is pressed
+    registerForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+    });
+
+    // Check if page is opened via file:// protocol
+    if (window.location.protocol === 'file:') {
+        console.warn('⚠️ Warning: Page opened via file:// protocol. API requests may fail. Use a local server (http://localhost:3000).');
+    }
+
     // Add this at the beginning of your getOtpBtn click handler
     getOtpBtn.addEventListener('click', async (e) => {
         e.preventDefault(); // Prevent default form submission behavior
 
         email = emailInput.value.trim();
-        const emailPassword = document.getElementById('emailPassword').value.trim(); // Get emailPassword
-        const loginPassword = document.getElementById('loginPassword').value.trim(); // Get loginPassword
 
-        if (!email || !emailPassword || !loginPassword) {
-            showMessage('All fields are required', 'error');
+        if (!email) {
+            showMessage('Email is required', 'error');
             return;
         }
 
@@ -79,7 +87,10 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             setLoading(getOtpBtn, true, 'Get OTP');
 
-            const response = await fetch('/send-otp', {
+            const apiUrl = '/send-otp';
+            console.log(`Fetching: ${apiUrl} for ${email}`);
+
+            const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email })

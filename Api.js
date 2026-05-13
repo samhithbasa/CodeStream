@@ -663,6 +663,7 @@ async function sendResolutionEmail(ticket) {
 app.post('/send-otp', otpLimiter, async (req, res) => {
     try {
         const { email } = req.body;
+        console.log(`[API] Received OTP request for: ${email}`);
         const db = getDb();
         const users = db.collection('users');
         const otps = db.collection('otps');
@@ -677,6 +678,7 @@ app.post('/send-otp', otpLimiter, async (req, res) => {
 
         const existingUser = await users.findOne({ email });
         if (existingUser) {
+            console.log(`[API] OTP Request Failed: Email ${email} already registered`);
             return res.status(400).json({ error: 'Email already registered' });
         }
 
