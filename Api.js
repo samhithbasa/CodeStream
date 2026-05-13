@@ -689,13 +689,21 @@ app.put('/api/admin/tickets/:id', authenticateAdmin, async (req, res) => {
             return res.status(400).json({ error: 'Invalid status' });
         }
 
+        const ticket = await contactSubmissions.findOne({ _id: new ObjectId(id) });
+        if (!ticket) {
+            return res.status(404).json({ error: 'Ticket not found' });
+        }
+
         const result = await contactSubmissions.updateOne(
             { _id: new ObjectId(id) },
             { $set: { status, updatedAt: new Date() } }
         );
 
-        if (result.modifiedCount === 0) {
-            return res.status(404).json({ error: 'Ticket not found' });
+        if (result.modifiedCount > 0) {
+            // Send notification for noteworthy status changes
+            if (status === 'in-progress' || status === 'resolved') {
+                sendTicketUpdateEmail(ticket, status);
+            }
         }
 
         res.json({ success: true, message: 'Ticket updated' });
@@ -705,21 +713,31 @@ app.put('/api/admin/tickets/:id', authenticateAdmin, async (req, res) => {
     }
 });
 
-async function sendResolutionEmail(ticket) {
+async function sendTicketUpdateEmail(ticket, status) {
     try {
+        let statusText = status;
+        let statusColor = '#3498db'; // blue for in-progress
+        
+        if (status === 'resolved') {
+            statusText = 'Resolved';
+            statusColor = '#27ae60'; // green
+        } else if (status === 'in-progress') {
+            statusText = 'In Progress';
+        }
+
         const emailHtml = getEmailTemplate(
-            'Support Ticket Resolved',
+            `Ticket Update: ${statusText}`,
             `
             <p>Hello ${ticket.name},</p>
-            <p>We're happy to inform you that your support ticket has been resolved.</p>
+            <p>Your support ticket status has been updated to <strong>${statusText}</strong>.</p>
             
             <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 25px 0; border: 1px solid #eee;">
                 <h3 style="margin-top: 0; color: #2c3e50; font-size: 16px;">Ticket Details</h3>
                 <p style="margin: 5px 0;"><strong>Ticket ID:</strong> ${ticket.ticketId}</p>
                 <p style="margin: 5px 0;"><strong>Subject:</strong> ${ticket.subject}</p>
-                <p style="margin: 5px 0;"><strong>Status:</strong> <span style="color: #27ae60; font-weight: bold;">Resolved</span></p>
+                <p style="margin: 5px 0;"><strong>New Status:</strong> <span style="color: ${statusColor}; font-weight: bold;">${statusText}</span></p>
                 
-                ${ticket.resolutionNotes ? `
+                ${status === 'resolved' && ticket.resolutionNotes ? `
                 <p style="margin: 15px 0 5px 0;"><strong>Resolution Details:</strong></p>
                 <div style="background-color: #fff; padding: 15px; border-radius: 5px; border: 1px solid #eee; font-style: italic; color: #444;">
                     ${ticket.resolutionNotes.replace(/\n/g, '<br>')}
@@ -727,15 +745,15 @@ async function sendResolutionEmail(ticket) {
                 ` : ''}
             </div>
             
-            <p>If you have any further questions or if your issue persists, please feel free to reply to this email.</p>
+            <p>If you have any further questions, please feel free to reply to this email.</p>
             <p>Best regards,<br>The CodeStream Team</p>
             `
         );
 
-        await sendEmail(ticket.email, `Your ticket ${ticket.ticketId} has been resolved`, emailHtml);
-        console.log(`Resolution email sent to ${ticket.email}`);
+        await sendEmail(ticket.email, `Ticket Update: ${ticket.ticketId} - ${statusText}`, emailHtml);
+        console.log(`[API] Ticket status update email sent to ${ticket.email} (${statusText})`);
     } catch (error) {
-        console.error('Error sending resolution email:', error);
+        console.error('Error sending ticket update email:', error);
     }
 }
 
