@@ -247,6 +247,59 @@ async function sendEmailGmail(to, subject, htmlContent) {
     }
 }
 
+function getEmailTemplate(title, content, buttonText = null, buttonLink = null, isOtp = false) {
+    const buttonHtml = buttonText && buttonLink ? `
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="${buttonLink}" style="background: linear-gradient(45deg, #3498db, #2c3e50); color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                ${buttonText}
+            </a>
+        </div>` : '';
+
+    return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f4f7f9; color: #333; }
+            .wrapper { width: 100%; padding: 20px 0; }
+            .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+            .header { background: #2c3e50; padding: 30px; text-align: center; color: white; }
+            .header h1 { margin: 0; font-size: 24px; letter-spacing: 1px; }
+            .body { padding: 40px 30px; line-height: 1.6; }
+            .body h2 { color: #2c3e50; margin-top: 0; font-size: 20px; }
+            .otp-box { background: #f8f9fa; border: 2px dashed #3498db; border-radius: 8px; padding: 20px; text-align: center; margin: 25px 0; }
+            .otp-code { font-size: 32px; font-weight: bold; color: #2c3e50; letter-spacing: 5px; margin: 0; }
+            .footer { background: #f8f9fa; padding: 20px; text-align: center; color: #888; font-size: 12px; border-top: 1px solid #eee; }
+            .footer p { margin: 5px 0; }
+            @media only screen and (max-width: 600px) {
+                .container { width: 95% !important; }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="wrapper">
+            <div class="container">
+                <div class="header">
+                    <h1>CodeStream</h1>
+                </div>
+                <div class="body">
+                    <h2>${title}</h2>
+                    ${content}
+                    ${buttonHtml}
+                </div>
+                <div class="footer">
+                    <p>&copy; 2026 CodeStream IDE. All rights reserved.</p>
+                    <p>Building the future of coding, together.</p>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    `;
+}
+
 // Wrapper to try multiple services in case of failure (e.g. SMTP blocked on Render)
 async function sendEmail(to, subject, htmlContent) {
     const preferredService = process.env.EMAIL_SERVICE?.toLowerCase() || 'resend';
@@ -583,17 +636,24 @@ app.post('/api/contact', async (req, res) => {
         // Save to database
         await contactSubmissions.insertOne(ticket);
 
-        await sendEmail(email, `Ticket Created: ${ticket.ticketId}`, `
-                <h2>Thank you for contacting us!</h2>
-                <p>We've received your message and will respond within 24 hours.</p>
-                <p><strong>Ticket ID:</strong> ${ticket.ticketId}</p>
-                <p><strong>Subject:</strong> ${subject}</p>
-                <hr>
-                <p><strong>Your Message:</strong></p>
-                <p>${message.replace(/\n/g, '<br>')}</p>
-                <hr>
-                <p>You can reply directly to this email to add more information.</p>
-            `);
+        const emailHtml = getEmailTemplate(
+            'Ticket Created: ' + ticket.ticketId,
+            `
+            <p>Hello ${name},</p>
+            <p>Thank you for contacting us! We've received your message and will respond within 24 hours.</p>
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <p style="margin: 0;"><strong>Ticket ID:</strong> ${ticket.ticketId}</p>
+                <p style="margin: 10px 0 0 0;"><strong>Subject:</strong> ${subject}</p>
+            </div>
+            <p><strong>Your Message:</strong></p>
+            <blockquote style="border-left: 4px solid #3498db; padding-left: 15px; font-style: italic; color: #555;">
+                ${message.replace(/\n/g, '<br>')}
+            </blockquote>
+            <p>You can reply directly to this email to add more information.</p>
+            `
+        );
+
+        await sendEmail(email, `Ticket Created: ${ticket.ticketId}`, emailHtml);
 
         res.json({
             success: true,
@@ -647,34 +707,32 @@ app.put('/api/admin/tickets/:id', authenticateAdmin, async (req, res) => {
 
 async function sendResolutionEmail(ticket) {
     try {
-        await sendEmail(ticket.email, `Your ticket ${ticket.ticketId} has been resolved`, `
-                <h2>Your Support Ticket Has Been Resolved</h2>
-                <p>Hello ${ticket.name},</p>
-                <p>We're happy to inform you that your support ticket has been resolved.</p>
+        const emailHtml = getEmailTemplate(
+            'Support Ticket Resolved',
+            `
+            <p>Hello ${ticket.name},</p>
+            <p>We're happy to inform you that your support ticket has been resolved.</p>
+            
+            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 25px 0; border: 1px solid #eee;">
+                <h3 style="margin-top: 0; color: #2c3e50; font-size: 16px;">Ticket Details</h3>
+                <p style="margin: 5px 0;"><strong>Ticket ID:</strong> ${ticket.ticketId}</p>
+                <p style="margin: 5px 0;"><strong>Subject:</strong> ${ticket.subject}</p>
+                <p style="margin: 5px 0;"><strong>Status:</strong> <span style="color: #27ae60; font-weight: bold;">Resolved</span></p>
                 
-                <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                    <h3>Ticket Details</h3>
-                    <p><strong>Ticket ID:</strong> ${ticket.ticketId}</p>
-                    <p><strong>Subject:</strong> ${ticket.subject}</p>
-                    <p><strong>Status:</strong> Resolved</p>
-                    <p><strong>Date Submitted:</strong> ${new Date(ticket.createdAt).toLocaleString()}</p>
-                    <p><strong>Date Resolved:</strong> ${new Date().toLocaleString()}</p>
-                    ${ticket.resolutionNotes ? `
-                    <p><strong>Resolution Details:</strong></p>
-                    <div style="background-color: #fff; padding: 10px; border-radius: 5px; margin-top: 5px;">
-                        ${ticket.resolutionNotes.replace(/\n/g, '<br>')}
-                    </div>
-                    ` : ''}
+                ${ticket.resolutionNotes ? `
+                <p style="margin: 15px 0 5px 0;"><strong>Resolution Details:</strong></p>
+                <div style="background-color: #fff; padding: 15px; border-radius: 5px; border: 1px solid #eee; font-style: italic; color: #444;">
+                    ${ticket.resolutionNotes.replace(/\n/g, '<br>')}
                 </div>
-                
-                <p>If you have any further questions or if your issue persists, please reply to this email.</p>
-                
-                <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;">
-                    <p>Was this solution helpful? <a href="#">Yes</a> | <a href="#">No</a></p>
-                </div>
-                
-                <p>Best regards,<br>The CodeEditor Team</p>
-            `);
+                ` : ''}
+            </div>
+            
+            <p>If you have any further questions or if your issue persists, please feel free to reply to this email.</p>
+            <p>Best regards,<br>The CodeStream Team</p>
+            `
+        );
+
+        await sendEmail(ticket.email, `Your ticket ${ticket.ticketId} has been resolved`, emailHtml);
         console.log(`Resolution email sent to ${ticket.email}`);
     } catch (error) {
         console.error('Error sending resolution email:', error);
@@ -715,11 +773,18 @@ app.post('/send-otp', otpLimiter, async (req, res) => {
         console.log('Attempting to send OTP email to:', email);
         console.log('Using EMAIL_USER:', process.env.EMAIL_USER ? 'Set' : 'Not Set');
 
-        await sendEmail(email, 'Your OTP for Registration', `
-                <h2>Your OTP Code</h2>
-                <p>Your OTP is: <strong>${otp}</strong></p>
-                <p>It will expire in 5 minutes.</p>
-            `);
+        const emailHtml = getEmailTemplate(
+            'Verify Your Email',
+            `
+            <p>Thank you for choosing CodeStream! Use the verification code below to complete your registration. This code will expire in <strong>5 minutes</strong>.</p>
+            <div class="otp-box">
+                <p class="otp-code">${otp}</p>
+            </div>
+            <p style="color: #666; font-size: 14px; text-align: center;">If you didn't request this code, you can safely ignore this email.</p>
+            `
+        );
+
+        await sendEmail(email, 'Your OTP for Registration', emailHtml);
         console.log('Email sent successfully to:', email);
         res.json({ message: 'OTP sent successfully' });
     } catch (error) {
@@ -1001,13 +1066,16 @@ app.post('/forgot-password', passwordResetLimiter, async (req, res) => {
         const host = req.headers.host;
         const resetLink = `${protocol}://${host}/reset-password?token=${token}`;
 
-        await sendEmail(email, 'Password Reset Request', `
-                <h2>Password Reset</h2>
-                <p>You requested to reset your password. Click the link below to proceed:</p>
-                <a href="${resetLink}">Reset Password</a>
-                <p>This link will expire in 1 hour.</p>
-                <p>If you didn't request this, please ignore this email.</p>
-            `);
+        const emailHtml = getEmailTemplate(
+            'Password Reset Request',
+            `
+            <p>We received a request to reset your password for your CodeStream account. Click the button below to choose a new password. This link will expire in <strong>1 hour</strong>.</p>
+            `,
+            'Reset Password',
+            resetLink
+        );
+
+        await sendEmail(email, 'Password Reset Request', emailHtml);
         res.json({
             message: 'Password reset email sent',
             token
