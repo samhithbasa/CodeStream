@@ -1101,7 +1101,10 @@
                 </div>
             `;
 
-                    listItem.querySelector('.code-name').addEventListener('click', (e) => startInlineRename(e, code.id));
+                    listItem.querySelector('.code-name').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        startInlineRename(e, code.id);
+                    });
 
                     listItem.querySelector('.load-btn').addEventListener('click', () => loadCode(code.id));
                     listItem.querySelector('.share-btn').addEventListener('click', (e) => shareCode(e, code.id));
@@ -1178,6 +1181,7 @@
             };
 
             input.onblur = saveRename;
+            input.onclick = (e) => e.stopPropagation();
 
             nameSpan.replaceWith(input);
             input.focus();
@@ -1397,7 +1401,7 @@
             .login-btn {
                 width: 100%;
                 padding: 12px;
-                background: linear-gradient(135deg, #极速电竞, #a777e3);
+                background: linear-gradient(135deg, #6e8efb, #a777e3);
                 color: white;
                 border: none;
                 border-radius: 6px;
