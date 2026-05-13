@@ -202,8 +202,12 @@ async function sendEmailResend(to, subject, htmlContent) {
             let body = '';
             res.on('data', (chunk) => body += chunk);
             res.on('end', () => {
-                if (res.statusCode >= 200 && res.statusCode < 300) resolve(JSON.parse(body));
-                else reject(new Error(`Resend API error: ${res.statusCode} ${body}`));
+                if (res.statusCode >= 200 && res.statusCode < 300) {
+                    console.log(`[Email] Resend success: ${body}`);
+                    resolve(JSON.parse(body));
+                } else {
+                    reject(new Error(`Resend API error: ${res.statusCode} ${body}`));
+                }
             });
         });
         req.on('error', reject);
@@ -243,17 +247,34 @@ async function sendEmailGmail(to, subject, htmlContent) {
     }
 }
 
-// Wrapper to switch between services easily
+// Wrapper to try multiple services in case of failure (e.g. SMTP blocked on Render)
 async function sendEmail(to, subject, htmlContent) {
-    const service = process.env.EMAIL_SERVICE?.toLowerCase() || 'gmail';
+    const preferredService = process.env.EMAIL_SERVICE?.toLowerCase() || 'resend';
+    
+    // Define the order of services to try
+    const services = [preferredService, 'resend', 'gmail', 'brevo'];
+    const uniqueServices = [...new Set(services)]; // Remove duplicates
+    
+    let lastError;
 
-    if (service === 'gmail') {
-        return sendEmailGmail(to, subject, htmlContent);
-    } else if (service === 'brevo') {
-        return sendEmailBrevo(to, subject, htmlContent);
-    } else {
-        return sendEmailResend(to, subject, htmlContent);
+    for (const service of uniqueServices) {
+        try {
+            console.log(`[Email] Attempting to send using service: ${service}`);
+            if (service === 'gmail') {
+                return await sendEmailGmail(to, subject, htmlContent);
+            } else if (service === 'brevo') {
+                return await sendEmailBrevo(to, subject, htmlContent);
+            } else if (service === 'resend') {
+                return await sendEmailResend(to, subject, htmlContent);
+            }
+        } catch (error) {
+            console.warn(`[Email] ${service} failed: ${error.message}`);
+            lastError = error;
+            // Continue to next service
+        }
     }
+
+    throw new Error(`All email services failed. Last error: ${lastError.message}`);
 }
 
 function generateOTP() {
