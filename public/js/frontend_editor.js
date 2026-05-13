@@ -1740,7 +1740,8 @@ class SimpleFrontendEditor {
                         <div class="project-card" style="background: rgba(255,255,255,0.05); border-radius: 10px; padding: 20px; border: 1px solid rgba(255,255,255,0.1);">
                             <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                                 <div>
-                                    <h3 style="margin: 0 0 10px 0; color: #fff;">${this.escapeHtml(project.name)}</h3>
+                                    <h3 class="project-name-header" style="margin: 0 0 10px 0; color: #fff; cursor: pointer;" title="Click to rename"
+                                        onclick="frontendEditor.startInlineRenameProject(event, '${project.id}')">${this.escapeHtml(project.name)}</h3>
                                     <p style="margin: 0; color: #aaa; font-size: 14px;">
                                         Created: ${new Date(project.createdAt).toLocaleDateString()}
                                     </p>
@@ -1792,6 +1793,86 @@ class SimpleFrontendEditor {
                 document.removeEventListener('keydown', closeModalOnEsc);
             }
         });
+    }
+
+    startInlineRenameProject(event, projectId) {
+        event.stopPropagation();
+        const nameHeader = event.target;
+        const currentName = nameHeader.textContent;
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = currentName;
+        input.className = 'inline-rename-input-frontend';
+        input.style.cssText = `
+            background: rgba(30, 41, 59, 0.9);
+            color: #fff;
+            border: 1px solid #3b82f6;
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            width: 100%;
+            outline: none;
+            margin-bottom: 10px;
+            font-family: inherit;
+        `;
+
+        let finished = false;
+
+        const saveRename = async () => {
+            if (finished) return;
+            finished = true;
+
+            const newName = input.value.trim();
+            if (newName && newName !== currentName) {
+                try {
+                    const token = Cookies.get('token');
+                    const response = await fetch(`/api/frontend/rename/${projectId}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ name: newName })
+                    });
+
+                    if (response.ok) {
+                        nameHeader.textContent = newName;
+                        // Also update main editor name if it's the current project
+                        if (this.currentProjectId === projectId) {
+                            const mainNameInput = document.getElementById('project-name');
+                            if (mainNameInput) mainNameInput.value = newName;
+                        }
+                    } else {
+                        nameHeader.textContent = currentName;
+                        const err = await response.json();
+                        alert('Failed to rename project: ' + (err.error || 'Unknown error'));
+                    }
+                } catch (err) {
+                    console.error(err);
+                    nameHeader.textContent = currentName;
+                }
+            } else {
+                nameHeader.textContent = currentName;
+            }
+            input.replaceWith(nameHeader);
+        };
+
+        input.onkeydown = (e) => {
+            if (e.key === 'Enter') saveRename();
+            if (e.key === 'Escape') {
+                finished = true;
+                nameHeader.textContent = currentName;
+                input.replaceWith(nameHeader);
+            }
+        };
+
+        input.onblur = saveRename;
+
+        nameHeader.replaceWith(input);
+        input.focus();
+        input.select();
     }
 
     async openProject(projectId) {

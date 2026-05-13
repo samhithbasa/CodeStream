@@ -758,6 +758,20 @@ body {
     word-break: break-word;
 }
 
+.inline-rename-input-frontend {
+    background: var(--input-bg, #1e293b);
+    color: var(--input-text, #f8fafc);
+    border: 1px solid #3b82f6;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    width: 100%;
+    outline: none;
+    margin-bottom: 10px;
+    font-family: inherit;
+}
+
 .project-card a {
     word-break: break-all;
 }

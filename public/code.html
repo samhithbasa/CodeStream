@@ -1091,7 +1091,7 @@
                     listItem.dataset.id = code.id;
                     listItem.innerHTML = `
                 <div class="code-info">
-                    <span class="code-name">${code.name}</span>
+                    <span class="code-name" title="Click to rename">${code.name}</span>
                     <span class="code-lang">${code.lang}</span>
                 </div>
                 <div class="code-actions">
@@ -1100,6 +1100,8 @@
                     <button class="delete-btn" title="Delete this code">🗑️</button>
                 </div>
             `;
+
+                    listItem.querySelector('.code-name').addEventListener('click', (e) => startInlineRename(e, code.id));
 
                     listItem.querySelector('.load-btn').addEventListener('click', () => loadCode(code.id));
                     listItem.querySelector('.share-btn').addEventListener('click', (e) => shareCode(e, code.id));
@@ -1116,6 +1118,70 @@
             </li>
         `;
             }
+        }
+
+        function startInlineRename(event, codeId) {
+            const nameSpan = event.target;
+            const currentName = nameSpan.textContent;
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = currentName;
+            input.className = 'inline-rename-input';
+
+            let finished = false;
+
+            const saveRename = async () => {
+                if (finished) return;
+                finished = true;
+
+                const newName = input.value.trim();
+                if (newName && newName !== currentName) {
+                    try {
+                        const token = Cookies.get('token');
+                        const response = await fetch(`/rename-code/${codeId}`, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${token}`
+                            },
+                            body: JSON.stringify({ name: newName })
+                        });
+
+                        if (response.ok) {
+                            nameSpan.textContent = newName;
+                            // Also update main input if it's the current code
+                            const mainNameInput = document.getElementById('code-name');
+                            if (mainNameInput.value === currentName) {
+                                mainNameInput.value = newName;
+                            }
+                        } else {
+                            nameSpan.textContent = currentName;
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        nameSpan.textContent = currentName;
+                    }
+                } else {
+                    nameSpan.textContent = currentName;
+                }
+                input.replaceWith(nameSpan);
+            };
+
+            input.onkeydown = (e) => {
+                if (e.key === 'Enter') saveRename();
+                if (e.key === 'Escape') {
+                    finished = true;
+                    nameSpan.textContent = currentName;
+                    input.replaceWith(nameSpan);
+                }
+            };
+
+            input.onblur = saveRename;
+
+            nameSpan.replaceWith(input);
+            input.focus();
+            input.select();
         }
 
         async function loadCode(codeId) {

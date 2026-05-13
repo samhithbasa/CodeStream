@@ -1419,6 +1419,36 @@ app.delete('/delete-code/:id', authenticateToken, (req, res) => {
     }
 });
 
+app.put('/rename-code/:id', authenticateToken, (req, res) => {
+    const { id } = req.params;
+    const { name } = req.body;
+    const filePath = path.join(CODE_STORAGE_DIR, `${id}.json`);
+
+    if (!name) {
+        return res.status(400).json({ error: "Name is required" });
+    }
+
+    if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: "Code not found" });
+    }
+
+    try {
+        const fileData = JSON.parse(fs.readFileSync(filePath, "utf8"));
+        if (fileData.userId !== req.user.userId) {
+            return res.status(403).json({ error: "Unauthorized to rename this code" });
+        }
+
+        fileData.name = name;
+        fileData.updatedAt = new Date();
+        fs.writeFileSync(filePath, JSON.stringify(fileData, null, 2), "utf8");
+
+        res.json({ success: true, message: "Code renamed successfully", name });
+    } catch (error) {
+        console.error("Error renaming code:", error);
+        res.status(500).json({ error: "Failed to rename code" });
+    }
+});
+
 app.post('/api/frontend/save', authenticateToken, async (req, res) => {
     try {
         const { name, files, assets, structure, deploymentHTML } = req.body;
@@ -1556,6 +1586,43 @@ app.get('/api/frontend/project/:id', async (req, res) => {
     } catch (error) {
         console.error('Error loading project:', error);
         res.status(500).json({ error: 'Failed to load project' });
+    }
+});
+
+app.put('/api/frontend/rename/:id', authenticateToken, async (req, res) => {
+    try {
+        const projectId = req.params.id;
+        const { name } = req.body;
+
+        if (!name) {
+            return res.status(400).json({ error: 'Name is required' });
+        }
+
+        const projectPath = path.join(FRONTEND_STORAGE_DIR, `${projectId}.json`);
+
+        if (!fs.existsSync(projectPath)) {
+            return res.status(404).json({ error: 'Project not found' });
+        }
+
+        const projectData = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
+
+        // Verify ownership
+        if (projectData.userId && projectData.userId !== req.user.userId) {
+            return res.status(403).json({ error: 'Unauthorized to rename this project' });
+        }
+
+        projectData.name = name;
+        projectData.updatedAt = new Date();
+        
+        // Re-generate deployment HTML with new name
+        projectData.deploymentHTML = generateDeployedHTML(projectData, req);
+
+        fs.writeFileSync(projectPath, JSON.stringify(projectData, null, 2), 'utf8');
+
+        res.json({ success: true, message: 'Project renamed successfully', name });
+    } catch (error) {
+        console.error('Error renaming frontend project:', error);
+        res.status(500).json({ error: 'Failed to rename project' });
     }
 });
 

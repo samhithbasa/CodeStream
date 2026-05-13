@@ -164,6 +164,19 @@ header #logo:hover {
     filter: brightness(1.1);
 }
 
+.inline-rename-input {
+    background: var(--input-bg);
+    color: var(--text-color);
+    border: 1px solid var(--accent-1);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-family: inherit;
+    font-size: 14px;
+    width: 100%;
+    outline: none;
+    margin-bottom: 5px;
+}
+
 .cm-solarized-btn:active:not(:disabled) {
     transform: translateY(0);
     filter: brightness(0.95);
