@@ -3105,7 +3105,7 @@ function getNextGeminiKey() {
 
 app.post('/api/ai/generate', async (req, res) => {
     try {
-        const { prompt, context, mode } = req.body;
+        const { prompt, context, mode, image } = req.body;
         
         const apiKey = getNextGeminiKey();
         if (!apiKey) {
@@ -3126,20 +3126,25 @@ app.post('/api/ai/generate', async (req, res) => {
                  "I can help you to built an realtime websites.."
                  Do not include any other explanations, comments, or details. Output ONLY this exact string.
 
-            2. NEW PROJECT ISOLATION:
+            2. SCREENSHOT-TO-CODE (UI IMAGE ANALYSIS):
+               - If an image/screenshot of a UI is provided, analyze its layout, elements, spacing, typography, colors, and styling carefully.
+               - Recreate the design EXACTLY as shown in the screenshot using clean semantic HTML and custom styling in CSS.
+               - Generate fully responsive layouts (using Flexbox/Grid) with beautiful typography, colors matching the image, and modern styling. Do not leave placeholder sections or incomplete code.
+
+            3. NEW PROJECT ISOLATION:
                - Analyze the user's prompt to determine if they are requesting a new, different, or unrelated project compared to the existing code provided in the "CURRENT CODE CONTEXT".
                - If they are starting a new, different, or unrelated project (for example, they ask for a "Weather App" but the context contains a "To-Do List"), you MUST completely ignore the "CURRENT CODE CONTEXT". Do not carry over, mix in, or reference any files or code from the previous project. Generate ONLY the code and files required for the newly requested project.
 
-            3. PAGING LOGIC: 
+            4. PAGING LOGIC: 
                - If the user asks for a "single page", "landing page", "portfolio", or doesn't specify multiple pages, generate ONLY ONE HTML file (usually index.html). 
                - Do NOT include navigation links to 'About', 'Contact', or 'Login' unless the user explicitly requested those separate pages.
                - If the user explicitly asks for a "multiple pages" or "multi-page" site, then you may generate navigation links and the corresponding code for those pages.
             
-            4. CODE STYLE:
+            5. CODE STYLE:
                - Use modern, premium CSS (Flexbox/Grid, gradients, smooth transitions, Outfit/Inter fonts).
                - Avoid generic designs; aim for a professional, "SaaS-like" aesthetic.
             
-            5. OUTPUT FORMAT:
+            6. OUTPUT FORMAT:
                - Always wrap code in markdown blocks with the filename as a comment at the top, e.g., <!-- index.html -->.
                - Be concise but helpful.`;
         } else {
@@ -3152,17 +3157,32 @@ app.post('/api/ai/generate', async (req, res) => {
                  "I can help you with writing a code in c,cpp,java,python.."
                  Do not include any other explanations, comments, or details. Output ONLY this exact string.
 
-            2. NEW PROJECT ISOLATION:
+            2. IMAGE/SCREENSHOT ANALYSIS:
+               - If an image is provided, analyze its contents (e.g. it might be a screenshot of an error, console output, or code block). Help the user debug, write, or explain C, C++, Java, or Python code based on the image content.
+               - If the image contains a website design and they ask to recreate it, you MUST still deny and respond with "I can help you with writing a code in c,cpp,java,python.." because website development is not supported in this mode.
+
+            3. NEW PROJECT ISOLATION:
                - Analyze the user's prompt to determine if they are requesting a new, different, or unrelated project/file compared to the existing code provided in the "CURRENT CODE CONTEXT".
                - If they are starting a new, different, or unrelated project/file, you MUST completely ignore the "CURRENT CODE CONTEXT". Do not carry over, reference, or output any code from the previous project. Provide only the code/files for the newly requested project.
 
-            3. Analyze the context provided to understand the user's goals.
-            4. Provide high-quality, documented, and bug-free code in C, C++, Java, Python, or JS.
-            5. If debugging, explain the cause of the error clearly and provide the fixed code.
-            6. Wrap all code in markdown blocks.`;
+            4. Analyze the context provided to understand the user's goals.
+            5. Provide high-quality, documented, and bug-free code in C, C++, Java, Python, or JS.
+            6. If debugging, explain the cause of the error clearly and provide the fixed code.
+            7. Wrap all code in markdown blocks.`;
         }
 
-        const fullPrompt = `${systemInstruction}\n\nCURRENT CODE CONTEXT:\n${context || 'No code provided.'}\n\nUSER PROMPT:\n${prompt}`;
+        const contents = [];
+        if (image && image.data && image.mimeType) {
+            contents.push({
+                inlineData: {
+                    data: image.data,
+                    mimeType: image.mimeType
+                }
+            });
+        }
+
+        const fullPrompt = `${systemInstruction}\n\nCURRENT CODE CONTEXT:\n${context || 'No code provided.'}\n\nUSER PROMPT:\n${prompt || 'Recreate this UI design exactly.'}`;
+        contents.push(fullPrompt);
 
         // Set up SSE streaming headers so frontend receives tokens in real-time
         res.setHeader('Content-Type', 'text/event-stream');
@@ -3170,7 +3190,7 @@ app.post('/api/ai/generate', async (req, res) => {
         res.setHeader('Connection', 'keep-alive');
         res.flushHeaders();
 
-        const streamResult = await model.generateContentStream(fullPrompt);
+        const streamResult = await model.generateContentStream(contents);
 
         for await (const chunk of streamResult.stream) {
             const chunkText = chunk.text();

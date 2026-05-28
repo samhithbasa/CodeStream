@@ -184,7 +184,14 @@ document.addEventListener('DOMContentLoaded', function() {
         <div class="ai-chat-box" id="ai-chat-box">
             <div class="ai-message ai-system">Hello! I am your AI Developer Assistant. How can I help you with your UI/UX or logic today?</div>
         </div>
+        <!-- Image Preview Container -->
+        <div class="ai-image-preview-container" id="ai-image-preview-container" style="display: none;">
+            <img id="ai-image-preview" src="" alt="Attached Image">
+            <button id="ai-image-remove" class="ai-image-remove-btn" title="Remove Image">&times;</button>
+        </div>
         <div class="ai-input-area">
+            <button id="ai-image-btn" class="ai-image-btn" title="Upload UI Image">🖼️</button>
+            <input type="file" id="ai-image-input" accept="image/*" style="display: none;">
             <textarea id="ai-prompt" placeholder="Ask me to generate a beautiful button, fix CSS, or write logic..." rows="2"></textarea>
             <button id="send-ai-btn" class="ai-send-btn">Send</button>
         </div>

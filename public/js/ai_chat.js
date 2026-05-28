@@ -11,6 +11,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const sendAiBtn = document.getElementById('send-ai-btn');
     const aiPromptInput = document.getElementById('ai-prompt');
     const chatBox = document.getElementById('ai-chat-box');
+    
+    // Image Upload Elements and State
+    const imageBtn = document.getElementById('ai-image-btn');
+    const imageInput = document.getElementById('ai-image-input');
+    const previewContainer = document.getElementById('ai-image-preview-container');
+    const previewImg = document.getElementById('ai-image-preview');
+    const removeImageBtn = document.getElementById('ai-image-remove');
+    let attachedImage = null; // Stores { data: string (base64), mimeType: string }
 
     // Function to parse naive markdown manually to HTML and inject Accept/Reject UI
     let codeBlockIdCount = 0;
@@ -131,9 +139,52 @@ document.addEventListener('DOMContentLoaded', () => {
             aiPanel.classList.remove('open');
         });
 
+        // Image Upload Handlers
+        if (imageBtn && imageInput) {
+            imageBtn.addEventListener('click', () => {
+                imageInput.click();
+            });
+
+            imageInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                if (!file.type.startsWith('image/')) {
+                    alert('Please select an image file.');
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const dataUrl = event.target.result;
+                    // Extract raw base64 data
+                    const base64Data = dataUrl.split(',')[1];
+                    
+                    attachedImage = {
+                        data: base64Data,
+                        mimeType: file.type
+                    };
+
+                    // Show preview UI
+                    if (previewImg) previewImg.src = dataUrl;
+                    if (previewContainer) previewContainer.style.display = 'flex';
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        if (removeImageBtn) {
+            removeImageBtn.addEventListener('click', () => {
+                attachedImage = null;
+                if (imageInput) imageInput.value = '';
+                if (previewContainer) previewContainer.style.display = 'none';
+                if (previewImg) previewImg.src = '';
+            });
+        }
+
         const sendRequest = async () => {
             const prompt = aiPromptInput.value.trim();
-            if (!prompt) return;
+            if (!prompt && !attachedImage) return;
 
             // Gather context
             let context = '';
@@ -154,10 +205,37 @@ document.addEventListener('DOMContentLoaded', () => {
             // Append user message
             const userMsg = document.createElement('div');
             userMsg.className = 'ai-message user';
-            userMsg.textContent = prompt;
+            
+            // If image is attached, append it as a thumbnail in the chat bubble
+            if (attachedImage) {
+                const imgEl = document.createElement('img');
+                imgEl.src = `data:${attachedImage.mimeType};base64,${attachedImage.data}`;
+                imgEl.style.cssText = 'max-width: 100%; max-height: 120px; border-radius: 6px; display: block; margin-bottom: 5px; border: 1px solid rgba(255,255,255,0.15);';
+                userMsg.appendChild(imgEl);
+            }
+            
+            if (prompt) {
+                const textSpan = document.createElement('span');
+                textSpan.textContent = prompt;
+                userMsg.appendChild(textSpan);
+            } else {
+                const textSpan = document.createElement('span');
+                textSpan.textContent = "Recreate this UI design exactly.";
+                textSpan.style.fontStyle = 'italic';
+                textSpan.style.opacity = '0.8';
+                userMsg.appendChild(textSpan);
+            }
+            
             chatBox.appendChild(userMsg);
             
+            // Keep local reference to send, then reset UI and state
+            const payloadImage = attachedImage;
+            attachedImage = null;
             aiPromptInput.value = '';
+            if (imageInput) imageInput.value = '';
+            if (previewContainer) previewContainer.style.display = 'none';
+            if (previewImg) previewImg.src = '';
+            
             chatBox.scrollTop = chatBox.scrollHeight;
 
             // Append morphing emoji progress loading indicator
@@ -259,7 +337,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const response = await fetch('/api/ai/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt, context, mode })
+                    body: JSON.stringify({ prompt, context, mode, image: payloadImage })
                 });
 
                 // Streaming: read as Server-Sent Events
