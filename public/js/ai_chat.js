@@ -298,22 +298,6 @@ document.addEventListener('DOMContentLoaded', () => {
                                     // Full response received — now render proper parsed markdown
                                     aiMsg.innerHTML = parseMarkdown(rawText);
                                     
-                                    // Automatically stage & apply generated code blocks directly into editor tabs
-                                    setTimeout(() => {
-                                        const acceptButtons = aiMsg.querySelectorAll('.ai-btn-accept');
-                                        acceptButtons.forEach(btn => {
-                                            const onclickAttr = btn.getAttribute('onclick');
-                                            if (onclickAttr) {
-                                                const matches = onclickAttr.match(/acceptAICode\('([^']+)',\s*'([^']*)'\)/);
-                                                if (matches) {
-                                                    const blockId = matches[1];
-                                                    const blockLang = matches[2];
-                                                    window.acceptAICode(blockId, blockLang);
-                                                }
-                                            }
-                                        });
-                                    }, 100);
-                                    
                                     if (aiMsgAppended) {
                                         chatBox.scrollTop = chatBox.scrollHeight;
                                     }
