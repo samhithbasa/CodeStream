@@ -160,13 +160,100 @@ document.addEventListener('DOMContentLoaded', () => {
             aiPromptInput.value = '';
             chatBox.scrollTop = chatBox.scrollHeight;
 
-            // Append loading indicator
+            // Append morphing emoji progress loading indicator
             const loadingMsg = document.createElement('div');
-            loadingMsg.className = 'ai-loader typing-indicator';
+            loadingMsg.className = 'ai-loader emoji-loader-container';
             loadingMsg.style.display = 'flex';
-            loadingMsg.innerHTML = '<span></span><span></span><span></span>';
+            loadingMsg.style.opacity = '1';
+            loadingMsg.style.transform = 'scale(1)';
+            loadingMsg.innerHTML = `
+                <div class="emoji-face">😢</div>
+                <div class="emoji-progress-bar"><div class="emoji-progress-fill"></div></div>
+                <div class="emoji-status-text">Connecting to AI...</div>
+            `;
             chatBox.appendChild(loadingMsg);
             chatBox.scrollTop = chatBox.scrollHeight;
+
+            // Setup morphing loader state
+            let progress = 0;
+            const emojis = ['😢', '😟', '😕', '😐', '🙂', '😀', '😁', '🥳'];
+            const statusTexts = [
+                'Connecting to AI...',
+                'Analyzing context...',
+                'Formulating thoughts...',
+                'Generating response...'
+            ];
+            
+            const emojiFaceEl = loadingMsg.querySelector('.emoji-face');
+            const progressFillEl = loadingMsg.querySelector('.emoji-progress-fill');
+            const statusTextEl = loadingMsg.querySelector('.emoji-status-text');
+
+            let streamStarted = false;
+            let aiMsgAppended = false;
+
+            const aiMsg = document.createElement('div');
+            aiMsg.className = 'ai-message ai-system';
+            aiMsg.style.opacity = '0'; // Keep hidden initially
+            aiMsg.style.transition = 'opacity 0.3s ease';
+
+            const progressInterval = setInterval(() => {
+                if (streamStarted) {
+                    // Zoom to 100% when stream starts/progresses
+                    progress += (100 - progress) * 0.25;
+                    if (progress >= 99) {
+                        progress = 100;
+                    }
+                } else {
+                    // Regular progress increment, slowing down near 90%
+                    if (progress < 90) {
+                        progress += 1.5;
+                    } else {
+                        progress += (95 - progress) * 0.05;
+                    }
+                }
+
+                // Update emoji face
+                const emojiIdx = Math.min(Math.floor((progress / 100) * emojis.length), emojis.length - 1);
+                emojiFaceEl.textContent = emojis[emojiIdx];
+                
+                // Micro-bounce transition when emoji morphs
+                const prevEmoji = emojiFaceEl.getAttribute('data-emoji');
+                if (prevEmoji !== emojis[emojiIdx]) {
+                    emojiFaceEl.setAttribute('data-emoji', emojis[emojiIdx]);
+                    emojiFaceEl.style.transform = 'scale(1.2) translateY(-2px)';
+                    setTimeout(() => {
+                        emojiFaceEl.style.transform = 'none';
+                    }, 150);
+                }
+
+                // Update progress bar width
+                progressFillEl.style.width = `${progress}%`;
+
+                // Update status text based on progress stage
+                const statusIdx = Math.min(Math.floor((progress / 100) * statusTexts.length), statusTexts.length - 1);
+                statusTextEl.textContent = statusTexts[statusIdx];
+
+                // When complete, reveal response and remove loader
+                if (progress >= 100) {
+                    clearInterval(progressInterval);
+                    
+                    // Fade out loader
+                    loadingMsg.style.opacity = '0';
+                    loadingMsg.style.transform = 'scale(0.95)';
+                    
+                    setTimeout(() => {
+                        loadingMsg.remove();
+                        
+                        // Append & reveal the AI response
+                        if (!aiMsgAppended) {
+                            chatBox.appendChild(aiMsg);
+                            aiMsgAppended = true;
+                        }
+                        aiMsg.style.opacity = '1';
+                        chatBox.scrollTop = chatBox.scrollHeight;
+                    }, 300);
+                }
+            }, 60);
 
             try {
                 const response = await fetch('/api/ai/generate', {
@@ -174,12 +261,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ prompt, context, mode })
                 });
-
-                loadingMsg.remove();
-
-                const aiMsg = document.createElement('div');
-                aiMsg.className = 'ai-message ai-system';
-                chatBox.appendChild(aiMsg);
 
                 // Streaming: read as Server-Sent Events
                 const reader = response.body.getReader();
@@ -200,14 +281,42 @@ document.addEventListener('DOMContentLoaded', () => {
                             try {
                                 const parsed = JSON.parse(line.slice(6));
                                 if (parsed.token) {
+                                    // First token received! Mark stream as started
+                                    streamStarted = true;
+                                    
                                     rawText += parsed.token;
                                     aiMsg.innerHTML = rawText.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                                    chatBox.scrollTop = chatBox.scrollHeight;
+                                    
+                                    // If message is already revealed, scroll
+                                    if (aiMsgAppended) {
+                                        chatBox.scrollTop = chatBox.scrollHeight;
+                                    }
                                 }
                                 if (parsed.done) {
+                                    streamStarted = true; // Ensure 100% progress
+                                    
                                     // Full response received — now render proper parsed markdown
                                     aiMsg.innerHTML = parseMarkdown(rawText);
-                                    chatBox.scrollTop = chatBox.scrollHeight;
+                                    
+                                    // Automatically stage & apply generated code blocks directly into editor tabs
+                                    setTimeout(() => {
+                                        const acceptButtons = aiMsg.querySelectorAll('.ai-btn-accept');
+                                        acceptButtons.forEach(btn => {
+                                            const onclickAttr = btn.getAttribute('onclick');
+                                            if (onclickAttr) {
+                                                const matches = onclickAttr.match(/acceptAICode\('([^']+)',\s*'([^']*)'\)/);
+                                                if (matches) {
+                                                    const blockId = matches[1];
+                                                    const blockLang = matches[2];
+                                                    window.acceptAICode(blockId, blockLang);
+                                                }
+                                            }
+                                        });
+                                    }, 100);
+                                    
+                                    if (aiMsgAppended) {
+                                        chatBox.scrollTop = chatBox.scrollHeight;
+                                    }
                                 }
                                 if (parsed.error) {
                                     aiMsg.textContent = "Error: " + parsed.error;
@@ -222,7 +331,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             } catch (err) {
                 console.error("AI Request Failed", err);
+                clearInterval(progressInterval);
                 loadingMsg.remove();
+                
                 const errMsg = document.createElement('div');
                 errMsg.className = 'ai-message ai-system';
                 errMsg.textContent = "Failed to connect to the server.";
