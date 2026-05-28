@@ -275,27 +275,28 @@
     pointer-events: none;
 }
 
-/* Morphing Emoji Loader Styles (Compact) */
+/* Morphing Emoji Loader Styles (Compact & Small) */
 .emoji-loader-container {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 4px;
-    padding: 6px 10px;
+    padding: 6px;
     background: rgba(255, 255, 255, 0.08);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
+    border-radius: 8px;
     align-self: flex-start;
     margin-bottom: 10px;
-    width: 100%;
-    max-width: 130px;
+    width: 36px;
+    height: 36px;
+    box-sizing: border-box;
     animation: fadeIn 0.3s ease;
     transition: opacity 0.5s ease, transform 0.5s ease;
 }
 
 .emoji-face {
-    font-size: 1.2rem;
+    font-size: 1.1rem;
     line-height: 1;
     display: inline-block;
     transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -303,10 +304,10 @@
 }
 
 .emoji-progress-bar {
-    width: 100%;
-    height: 3px;
+    width: 18px; /* same width as the emoji face */
+    height: 2px;
     background: rgba(255, 255, 255, 0.15);
-    border-radius: 1.5px;
+    border-radius: 1px;
     overflow: hidden;
     position: relative;
 }
@@ -315,15 +316,8 @@
     height: 100%;
     width: 0%;
     background: linear-gradient(90deg, #f59e0b, #10b981);
-    border-radius: 1.5px;
+    border-radius: 1px;
     transition: width 0.3s ease, background 0.3s ease;
-}
-
-.emoji-status-text {
-    font-size: 0.65rem;
-    color: rgba(255, 255, 255, 0.7);
-    font-weight: 500;
-    letter-spacing: 0.1px;
 }
 
 @keyframes emoji-bounce-idle {

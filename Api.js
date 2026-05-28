@@ -3113,8 +3113,7 @@ app.post('/api/ai/generate', async (req, res) => {
         }
 
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
+        
         let systemInstruction = "";
         if (mode === 'frontend') {
             systemInstruction = `You are a world-class Frontend Developer AI. You are integrated into a Web Playground where users can create HTML, CSS, and JS.
@@ -3171,6 +3170,11 @@ app.post('/api/ai/generate', async (req, res) => {
             7. Wrap all code in markdown blocks.`;
         }
 
+        const model = genAI.getGenerativeModel({ 
+            model: "gemini-2.5-flash",
+            systemInstruction: systemInstruction 
+        });
+
         const contents = [];
         if (image && image.data && image.mimeType) {
             contents.push({
@@ -3181,7 +3185,14 @@ app.post('/api/ai/generate', async (req, res) => {
             });
         }
 
-        const fullPrompt = `${systemInstruction}\n\nCURRENT CODE CONTEXT:\n${context || 'No code provided.'}\n\nUSER PROMPT:\n${prompt || 'Recreate this UI design exactly.'}`;
+        let userPrompt = prompt || 'Recreate this UI design exactly.';
+        if (image && mode === 'frontend') {
+            userPrompt += `\n\nIMPORTANT: Recreate the UI design in this screenshot/image. Generate the complete HTML and CSS code to implement this exact visual design. Wrap the files in markdown code blocks. DO NOT just transcribe or describe the image; generate the actual code files (e.g., <!-- index.html --> and <!-- style.css -->).`;
+        } else if (image) {
+            userPrompt += `\n\nIMPORTANT: Analyze the image contents to help with the code. DO NOT transcribe or describe the image; write the actual code.`;
+        }
+
+        const fullPrompt = `CURRENT CODE CONTEXT:\n${context || 'No code provided.'}\n\nUSER PROMPT:\n${userPrompt}`;
         contents.push(fullPrompt);
 
         // Set up SSE streaming headers so frontend receives tokens in real-time

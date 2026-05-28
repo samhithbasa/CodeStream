@@ -247,7 +247,6 @@ document.addEventListener('DOMContentLoaded', () => {
             loadingMsg.innerHTML = `
                 <div class="emoji-face">😢</div>
                 <div class="emoji-progress-bar"><div class="emoji-progress-fill"></div></div>
-                <div class="emoji-status-text">Connecting to AI...</div>
             `;
             chatBox.appendChild(loadingMsg);
             chatBox.scrollTop = chatBox.scrollHeight;
@@ -255,16 +254,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // Setup morphing loader state
             let progress = 0;
             const emojis = ['😢', '😟', '😕', '😐', '🙂', '😀', '😁', '🥳'];
-            const statusTexts = [
-                'Connecting to AI...',
-                'Analyzing context...',
-                'Formulating thoughts...',
-                'Generating response...'
-            ];
             
             const emojiFaceEl = loadingMsg.querySelector('.emoji-face');
             const progressFillEl = loadingMsg.querySelector('.emoji-progress-fill');
-            const statusTextEl = loadingMsg.querySelector('.emoji-status-text');
 
             let streamStarted = false;
             let aiMsgAppended = false;
@@ -307,9 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Update progress bar width
                 progressFillEl.style.width = `${progress}%`;
 
-                // Update status text based on progress stage
-                const statusIdx = Math.min(Math.floor((progress / 100) * statusTexts.length), statusTexts.length - 1);
-                statusTextEl.textContent = statusTexts[statusIdx];
+
 
                 // When complete, reveal response and remove loader
                 if (progress >= 100) {
