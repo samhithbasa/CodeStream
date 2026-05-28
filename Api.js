@@ -303,11 +303,11 @@ function getEmailTemplate(title, content, buttonText = null, buttonLink = null, 
 // Wrapper to try multiple services in case of failure (e.g. SMTP blocked on Render)
 async function sendEmail(to, subject, htmlContent) {
     const preferredService = process.env.EMAIL_SERVICE?.toLowerCase() || 'resend';
-    
+
     // Define the order of services to try
     const services = [preferredService, 'resend', 'gmail', 'brevo'];
     const uniqueServices = [...new Set(services)]; // Remove duplicates
-    
+
     let lastError;
 
     for (const service of uniqueServices) {
@@ -717,7 +717,7 @@ async function sendTicketUpdateEmail(ticket, status) {
     try {
         let statusText = status;
         let statusColor = '#3498db'; // blue for in-progress
-        
+
         if (status === 'resolved') {
             statusText = 'Resolved';
             statusColor = '#27ae60'; // green
@@ -1722,7 +1722,7 @@ app.put('/api/frontend/rename/:id', authenticateToken, async (req, res) => {
 
         projectData.name = name;
         projectData.updatedAt = new Date();
-        
+
         // Re-generate deployment HTML with new name
         projectData.deploymentHTML = generateDeployedHTML(projectData, req);
 
@@ -1753,7 +1753,7 @@ function replaceAssetPaths(content, assets, host) {
 
 function generateDeployedHTML(projectData, req = null, requestedFile = 'index.html') {
     // If exact deploymentHTML exists for this specific path, we could use it (but usually we re-generate)
-    
+
     console.log(`[DEBUG] Generating deployment HTML for: ${requestedFile}`);
 
     const { files, name, assets } = projectData;
@@ -2162,7 +2162,7 @@ app.get('/frontend/:id/:fileName(*)?', (req, res) => {
         // Determine content type
         let contentType = 'text/html';
         let fileCategory = 'html';
-        
+
         if (requestedFile.endsWith('.js')) {
             contentType = 'application/javascript';
             fileCategory = 'js';
@@ -3095,7 +3095,7 @@ function getNextGeminiKey() {
     if (!keysString) return null;
     const keys = keysString.split(',').map(k => k.trim()).filter(k => k);
     if (keys.length === 0) return null;
-    
+
     // Round-robin rotation
     const key = keys[currentGeminiKeyIndex];
     currentGeminiKeyIndex = (currentGeminiKeyIndex + 1) % keys.length;
@@ -3106,14 +3106,14 @@ function getNextGeminiKey() {
 app.post('/api/ai/generate', async (req, res) => {
     try {
         const { prompt, context, mode, image } = req.body;
-        
+
         const apiKey = getNextGeminiKey();
         if (!apiKey) {
             return res.status(500).json({ error: 'AI capabilities are not configured (Missing API Key in .env)' });
         }
 
         const genAI = new GoogleGenerativeAI(apiKey);
-        
+
         let systemInstruction = "";
         if (mode === 'frontend') {
             systemInstruction = `You are a world-class Frontend Developer AI. You are integrated into a Web Playground where users can create HTML, CSS, and JS.
@@ -3170,9 +3170,13 @@ app.post('/api/ai/generate', async (req, res) => {
             7. Wrap all code in markdown blocks.`;
         }
 
-        const model = genAI.getGenerativeModel({ 
+        const model = genAI.getGenerativeModel({
             model: "gemini-2.5-flash",
-            systemInstruction: systemInstruction 
+            systemInstruction: systemInstruction,
+            generationConfig: {
+                maxOutputTokens: 8192,  // Realistic cap for Gemini 2.5 Flash
+                temperature: 0.7,
+            }
         });
 
         const contents = [];
@@ -3206,11 +3210,12 @@ app.post('/api/ai/generate', async (req, res) => {
         for await (const chunk of streamResult.stream) {
             const chunkText = chunk.text();
             if (chunkText) {
-                res.write(`data: ${JSON.stringify({ token: chunkText })}\n\n`);
+                res.write(`data: ${JSON.stringify({ token: chunkText })}\r\n\r\n`);
+                if (res.flush) res.flush();  // Force immediate delivery
             }
         }
 
-        res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+        res.write(`data: ${JSON.stringify({ done: true })}\r\n\r\n`);
         res.end();
 
     } catch (error) {

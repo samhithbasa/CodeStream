@@ -335,6 +335,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const decoder = new TextDecoder();
                 let rawText = '';
                 let buffer = '';
+                let doneReceived = false;
 
                 while (true) {
                     const { value, done: readerDone } = await reader.read();
@@ -361,6 +362,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                     }
                                 }
                                 if (parsed.done) {
+                                    doneReceived = true;
                                     streamStarted = true; // Ensure 100% progress
                                     
                                     // Full response received — now render proper parsed markdown
@@ -377,6 +379,32 @@ document.addEventListener('DOMContentLoaded', () => {
                             } catch (_) {}
                         }
                     }
+                }
+
+                // Process any remaining data in the buffer after stream ends
+                if (buffer.trim()) {
+                    const remainingLines = buffer.split('\n');
+                    for (const line of remainingLines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const parsed = JSON.parse(line.slice(6));
+                                if (parsed.token) {
+                                    streamStarted = true;
+                                    rawText += parsed.token;
+                                }
+                                if (parsed.done) {
+                                    doneReceived = true;
+                                    streamStarted = true;
+                                }
+                            } catch (_) {}
+                        }
+                    }
+                }
+
+                // Fallback: if stream ended but we never got a 'done' event, still render markdown
+                if (!doneReceived && rawText) {
+                    streamStarted = true;
+                    aiMsg.innerHTML = parseMarkdown(rawText);
                 }
 
                 chatBox.scrollTop = chatBox.scrollHeight;
