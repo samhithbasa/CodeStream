@@ -3107,12 +3107,14 @@ app.post('/api/ai/generate', async (req, res) => {
     try {
         const { prompt, context, mode, image } = req.body;
 
-        const apiKey = getNextGeminiKey();
-        if (!apiKey) {
+        const keysString = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || '';
+        if (!keysString) {
             return res.status(500).json({ error: 'AI capabilities are not configured (Missing API Key in .env)' });
         }
-
-        const genAI = new GoogleGenerativeAI(apiKey);
+        const keys = keysString.split(',').map(k => k.trim()).filter(k => k);
+        if (keys.length === 0) {
+            return res.status(500).json({ error: 'AI capabilities are not configured (Missing API Key in .env)' });
+        }
 
         let systemInstruction = "";
         if (mode === 'frontend') {
@@ -3120,16 +3122,6 @@ app.post('/api/ai/generate', async (req, res) => {
         } else {
             systemInstruction = `You are a Senior Software Engineer AI...`; // Your existing instruction
         }
-
-        // Primary model: gemini-2.5-flash (exists and works)
-        const model = genAI.getGenerativeModel({
-            model: "gemini-2.5-flash",
-            systemInstruction: systemInstruction,
-            generationConfig: {
-                maxOutputTokens: 8192,
-                temperature: 0.7,
-            }
-        });
 
         const contents = [];
         if (image && image.data && image.mimeType) {
@@ -3151,28 +3143,65 @@ app.post('/api/ai/generate', async (req, res) => {
         const fullPrompt = `CURRENT CODE CONTEXT:\n${context || 'No code provided.'}\n\nUSER PROMPT:\n${userPrompt}`;
         contents.push(fullPrompt);
 
-        // Set up SSE streaming headers
+        let streamResult;
+        let success = false;
+        let lastError = null;
+
+        const startIndex = currentGeminiKeyIndex;
+        for (let i = 0; i < keys.length; i++) {
+            const attemptIndex = (startIndex + i) % keys.length;
+            const apiKey = keys[attemptIndex];
+            console.log(`[AI] Attempting AI generation with API Key index: ${attemptIndex}`);
+
+            try {
+                const genAI = new GoogleGenerativeAI(apiKey);
+                const model = genAI.getGenerativeModel({
+                    model: "gemini-2.5-flash",
+                    systemInstruction: systemInstruction,
+                    generationConfig: {
+                        maxOutputTokens: 8192,
+                        temperature: 0.7,
+                    }
+                });
+
+                try {
+                    streamResult = await model.generateContentStream(contents);
+                    success = true;
+                    currentGeminiKeyIndex = (attemptIndex + 1) % keys.length;
+                    console.log(`[AI] Successfully started generation with key index: ${attemptIndex}`);
+                    break;
+                } catch (streamError) {
+                    console.warn(`[AI] gemini-2.5-flash failed with key index ${attemptIndex}, attempting fallback to gemini-2.0-flash:`, streamError.message);
+                    
+                    const fallbackModel = genAI.getGenerativeModel({
+                        model: "gemini-2.0-flash",
+                        systemInstruction: systemInstruction,
+                        generationConfig: {
+                            maxOutputTokens: 8192,
+                            temperature: 0.7,
+                        }
+                    });
+                    streamResult = await fallbackModel.generateContentStream(contents);
+                    success = true;
+                    currentGeminiKeyIndex = (attemptIndex + 1) % keys.length;
+                    console.log(`[AI] Successfully started generation with fallback model and key index: ${attemptIndex}`);
+                    break;
+                }
+            } catch (err) {
+                console.error(`[AI] Error with API Key index ${attemptIndex}:`, err.message || err);
+                lastError = err;
+            }
+        }
+
+        if (!success) {
+            throw lastError || new Error("All configured Gemini API keys failed.");
+        }
+
+        // Set up SSE streaming headers (only when we successfully got the streamResult)
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
         res.flushHeaders();
-
-        let streamResult;
-        try {
-            streamResult = await model.generateContentStream(contents);
-        } catch (streamError) {
-            console.warn('[AI] gemini-2.5-flash failed, attempting fallback to gemini-2.0-flash:', streamError.message);
-            // ✅ FIXED: Use gemini-2.0-flash instead of deprecated gemini-1.5-flash
-            const fallbackModel = genAI.getGenerativeModel({
-                model: "gemini-2.0-flash",  // ← Changed from gemini-1.5-flash
-                systemInstruction: systemInstruction,
-                generationConfig: {
-                    maxOutputTokens: 8192,
-                    temperature: 0.7,
-                }
-            });
-            streamResult = await fallbackModel.generateContentStream(contents);
-        }
 
         for await (const chunk of streamResult.stream) {
             let chunkText = '';
