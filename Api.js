@@ -3116,65 +3116,17 @@ app.post('/api/ai/generate', async (req, res) => {
 
         let systemInstruction = "";
         if (mode === 'frontend') {
-            systemInstruction = `You are a world-class Frontend Developer AI. You are integrated into a Web Playground where users can create HTML, CSS, and JS.
-            
-            STRICT RULES:
-            1. RELEVANCY GUARDRAILS:
-               - You can only help the user with concepts related to building real-time websites (HTML, CSS, and JS).
-               - If the user requests to write code in other languages (such as C, C++, Java, Python) OR asks about any topic that is NOT relevant to building real-time websites (e.g., general knowledge, cooking, history, sports, life advice, creative writing, or general conversation), you MUST decline politely and respond ONLY with:
-                 "I can help you to built an realtime websites.."
-                 Do not include any other explanations, comments, or details. Output ONLY this exact string.
-
-            2. SCREENSHOT-TO-CODE (UI IMAGE ANALYSIS):
-               - If an image/screenshot of a UI is provided, analyze its layout, elements, spacing, typography, colors, and styling carefully.
-               - Recreate the design EXACTLY as shown in the screenshot using clean semantic HTML and custom styling in CSS.
-               - Generate fully responsive layouts (using Flexbox/Grid) with beautiful typography, colors matching the image, and modern styling. Do not leave placeholder sections or incomplete code.
-
-            3. NEW PROJECT ISOLATION:
-               - Analyze the user's prompt to determine if they are requesting a new, different, or unrelated project compared to the existing code provided in the "CURRENT CODE CONTEXT".
-               - If they are starting a new, different, or unrelated project (for example, they ask for a "Weather App" but the context contains a "To-Do List"), you MUST completely ignore the "CURRENT CODE CONTEXT". Do not carry over, mix in, or reference any files or code from the previous project. Generate ONLY the code and files required for the newly requested project.
-
-            4. PAGING LOGIC: 
-               - If the user asks for a "single page", "landing page", "portfolio", or doesn't specify multiple pages, generate ONLY ONE HTML file (usually index.html). 
-               - Do NOT include navigation links to 'About', 'Contact', or 'Login' unless the user explicitly requested those separate pages.
-               - If the user explicitly asks for a "multiple pages" or "multi-page" site, then you may generate navigation links and the corresponding code for those pages.
-            
-            5. CODE STYLE:
-               - Use modern, premium CSS (Flexbox/Grid, gradients, smooth transitions, Outfit/Inter fonts).
-               - Avoid generic designs; aim for a professional, "SaaS-like" aesthetic.
-            
-            6. OUTPUT FORMAT:
-               - Always wrap code in markdown blocks with the filename as a comment at the top, e.g., <!-- index.html -->.
-               - Be concise but helpful.`;
+            systemInstruction = `You are a world-class Frontend Developer AI...`; // Your existing instruction
         } else {
-            systemInstruction = `You are a Senior Software Engineer AI. You are integrated into a multi-language IDE.
-            
-            STRICT RULES:
-            1. RELEVANCY GUARDRAILS:
-               - You can only help the user with concepts related to writing code in C, C++, Java, and Python.
-               - If the user asks to build a website (HTML, CSS, JS, or frontend play) OR asks about any topic that is NOT relevant to writing code in C, C++, Java, or Python (e.g., general knowledge, cooking, history, sports, life advice, creative writing, or general conversation), you MUST decline politely and respond ONLY with:
-                 "I can help you with writing a code in c,cpp,java,python.."
-                 Do not include any other explanations, comments, or details. Output ONLY this exact string.
-
-            2. IMAGE/SCREENSHOT ANALYSIS:
-               - If an image is provided, analyze its contents (e.g. it might be a screenshot of an error, console output, or code block). Help the user debug, write, or explain C, C++, Java, or Python code based on the image content.
-               - If the image contains a website design and they ask to recreate it, you MUST still deny and respond with "I can help you with writing a code in c,cpp,java,python.." because website development is not supported in this mode.
-
-            3. NEW PROJECT ISOLATION:
-               - Analyze the user's prompt to determine if they are requesting a new, different, or unrelated project/file compared to the existing code provided in the "CURRENT CODE CONTEXT".
-               - If they are starting a new, different, or unrelated project/file, you MUST completely ignore the "CURRENT CODE CONTEXT". Do not carry over, reference, or output any code from the previous project. Provide only the code/files for the newly requested project.
-
-            4. Analyze the context provided to understand the user's goals.
-            5. Provide high-quality, documented, and bug-free code in C, C++, Java, Python, or JS.
-            6. If debugging, explain the cause of the error clearly and provide the fixed code.
-            7. Wrap all code in markdown blocks.`;
+            systemInstruction = `You are a Senior Software Engineer AI...`; // Your existing instruction
         }
 
+        // Primary model: gemini-2.5-flash (exists and works)
         const model = genAI.getGenerativeModel({
             model: "gemini-2.5-flash",
             systemInstruction: systemInstruction,
             generationConfig: {
-                maxOutputTokens: 8192,  // Realistic cap for Gemini 2.5 Flash
+                maxOutputTokens: 8192,
                 temperature: 0.7,
             }
         });
@@ -3199,7 +3151,7 @@ app.post('/api/ai/generate', async (req, res) => {
         const fullPrompt = `CURRENT CODE CONTEXT:\n${context || 'No code provided.'}\n\nUSER PROMPT:\n${userPrompt}`;
         contents.push(fullPrompt);
 
-        // Set up SSE streaming headers so frontend receives tokens in real-time
+        // Set up SSE streaming headers
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
@@ -3209,9 +3161,10 @@ app.post('/api/ai/generate', async (req, res) => {
         try {
             streamResult = await model.generateContentStream(contents);
         } catch (streamError) {
-            console.warn('[AI] gemini-2.5-flash failed, attempting fallback to gemini-1.5-flash:', streamError.message);
+            console.warn('[AI] gemini-2.5-flash failed, attempting fallback to gemini-2.0-flash:', streamError.message);
+            // ✅ FIXED: Use gemini-2.0-flash instead of deprecated gemini-1.5-flash
             const fallbackModel = genAI.getGenerativeModel({
-                model: "gemini-1.5-flash",
+                model: "gemini-2.0-flash",  // ← Changed from gemini-1.5-flash
                 systemInstruction: systemInstruction,
                 generationConfig: {
                     maxOutputTokens: 8192,
@@ -3226,11 +3179,11 @@ app.post('/api/ai/generate', async (req, res) => {
             try {
                 chunkText = chunk.text();
             } catch (err) {
-                console.warn('[AI] Error reading chunk text (might be a thinking chunk or safety flagged):', err.message);
+                console.warn('[AI] Error reading chunk text:', err.message);
             }
             if (chunkText) {
                 res.write(`data: ${JSON.stringify({ token: chunkText })}\r\n\r\n`);
-                if (res.flush) res.flush();  // Force immediate delivery
+                if (res.flush) res.flush();
             }
         }
 
