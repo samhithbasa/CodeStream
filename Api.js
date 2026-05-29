@@ -3205,10 +3205,29 @@ app.post('/api/ai/generate', async (req, res) => {
         res.setHeader('Connection', 'keep-alive');
         res.flushHeaders();
 
-        const streamResult = await model.generateContentStream(contents);
+        let streamResult;
+        try {
+            streamResult = await model.generateContentStream(contents);
+        } catch (streamError) {
+            console.warn('[AI] gemini-2.5-flash failed, attempting fallback to gemini-1.5-flash:', streamError.message);
+            const fallbackModel = genAI.getGenerativeModel({
+                model: "gemini-1.5-flash",
+                systemInstruction: systemInstruction,
+                generationConfig: {
+                    maxOutputTokens: 8192,
+                    temperature: 0.7,
+                }
+            });
+            streamResult = await fallbackModel.generateContentStream(contents);
+        }
 
         for await (const chunk of streamResult.stream) {
-            const chunkText = chunk.text();
+            let chunkText = '';
+            try {
+                chunkText = chunk.text();
+            } catch (err) {
+                console.warn('[AI] Error reading chunk text (might be a thinking chunk or safety flagged):', err.message);
+            }
             if (chunkText) {
                 res.write(`data: ${JSON.stringify({ token: chunkText })}\r\n\r\n`);
                 if (res.flush) res.flush();  // Force immediate delivery

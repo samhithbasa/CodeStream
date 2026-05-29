@@ -330,6 +330,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: JSON.stringify({ prompt, context, mode, image: payloadImage })
                 });
 
+                if (!response.ok) {
+                    let errorMessage = "Failed to connect to the server.";
+                    try {
+                        const errJson = await response.json();
+                        if (errJson && errJson.error) {
+                            errorMessage = errJson.error;
+                        }
+                    } catch (_) {}
+                    throw new Error(errorMessage);
+                }
+
                 // Streaming: read as Server-Sent Events
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
@@ -349,6 +360,20 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (line.startsWith('data: ')) {
                             try {
                                 const parsed = JSON.parse(line.slice(6));
+                                if (parsed.error) {
+                                    clearInterval(progressInterval);
+                                    loadingMsg.remove();
+                                    aiMsg.textContent = "Error: " + parsed.error;
+                                    aiMsg.style.color = "#ff6b6b";
+                                    aiMsg.style.opacity = '1';
+                                    if (!aiMsgAppended) {
+                                        chatBox.appendChild(aiMsg);
+                                        aiMsgAppended = true;
+                                    }
+                                    chatBox.scrollTop = chatBox.scrollHeight;
+                                    await reader.cancel();
+                                    return;
+                                }
                                 if (parsed.token) {
                                     // First token received! Mark stream as started
                                     streamStarted = true;
@@ -372,10 +397,6 @@ document.addEventListener('DOMContentLoaded', () => {
                                         chatBox.scrollTop = chatBox.scrollHeight;
                                     }
                                 }
-                                if (parsed.error) {
-                                    aiMsg.textContent = "Error: " + parsed.error;
-                                    aiMsg.style.color = "#ff6b6b";
-                                }
                             } catch (_) {}
                         }
                     }
@@ -388,6 +409,19 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (line.startsWith('data: ')) {
                             try {
                                 const parsed = JSON.parse(line.slice(6));
+                                if (parsed.error) {
+                                    clearInterval(progressInterval);
+                                    loadingMsg.remove();
+                                    aiMsg.textContent = "Error: " + parsed.error;
+                                    aiMsg.style.color = "#ff6b6b";
+                                    aiMsg.style.opacity = '1';
+                                    if (!aiMsgAppended) {
+                                        chatBox.appendChild(aiMsg);
+                                        aiMsgAppended = true;
+                                    }
+                                    chatBox.scrollTop = chatBox.scrollHeight;
+                                    return;
+                                }
                                 if (parsed.token) {
                                     streamStarted = true;
                                     rawText += parsed.token;
@@ -402,9 +436,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 // Fallback: if stream ended but we never got a 'done' event, still render markdown
-                if (!doneReceived && rawText) {
+                if (!doneReceived) {
                     streamStarted = true;
-                    aiMsg.innerHTML = parseMarkdown(rawText);
+                    if (!rawText) {
+                        aiMsg.textContent = "No response from AI assistant. Please try again.";
+                        aiMsg.style.color = "#ff6b6b";
+                        aiMsg.style.opacity = '1';
+                        if (!aiMsgAppended) {
+                            chatBox.appendChild(aiMsg);
+                            aiMsgAppended = true;
+                        }
+                    } else {
+                        aiMsg.innerHTML = parseMarkdown(rawText);
+                    }
                 }
 
                 chatBox.scrollTop = chatBox.scrollHeight;
@@ -416,9 +460,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 const errMsg = document.createElement('div');
                 errMsg.className = 'ai-message ai-system';
-                errMsg.textContent = "Failed to connect to the server.";
+                errMsg.textContent = err.message || "Failed to connect to the server.";
                 errMsg.style.color = "#ff6b6b";
                 chatBox.appendChild(errMsg);
+                chatBox.scrollTop = chatBox.scrollHeight;
             }
         };
 
