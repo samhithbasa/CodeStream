@@ -3,30 +3,63 @@
     --sidebar-width: 280px;
     --header-height: 70px;
     --primary-color: #4f46e5;
-    --primary-gradient: linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%);
+    --primary-gradient: linear-gradient(135deg, #4f46e5 0%, #0ea5e9 100%);
     --secondary-color: #6366f1;
     --success-color: #10b981;
     --danger-color: #ef4444;
     --warning-color: #f59e0b;
-    --dark-bg: #0f172a;
-    --light-bg: #f8fafc;
-    --border-color: rgba(255, 255, 255, 0.1);
-    --glass-bg: rgba(15, 23, 42, 0.7);
-    --glass-border: rgba(255, 255, 255, 0.1);
+
+    /* Light Mode Theme Variables (Default) */
+    --app-bg: #f1f5f9;
+    --app-header-bg: #ffffff;
+    --app-text: #0f172a;
+    --app-border: rgba(15, 23, 42, 0.08);
+    --app-input-bg: #ffffff;
+    --app-input-text: #0f172a;
+    --app-tab-bg: #e2e8f0;
+    --app-tab-active-bg: #ffffff;
+    --app-editor-bg: #ffffff;
+    --app-editor-text: #0f172a;
+    --app-glass-bg: rgba(255, 255, 255, 0.85);
+    --app-glass-border: rgba(79, 70, 229, 0.12);
+    
+    /* Legacy variables for compatibility */
+    --dark-bg: var(--app-bg);
+    --light-bg: #ffffff;
+    --border-color: var(--app-border);
+    --glass-bg: var(--app-glass-bg);
+    --glass-border: var(--app-glass-border);
+    --text-color: var(--app-text);
 }
 
-/* Night Mode Variables */
+/* Night Mode Theme Variables */
 .night-mode {
-    --dark-bg: #020617;
-    --light-bg: #0f172a;
-    --border-color: rgba(255, 255, 255, 0.08);
-    --text-color: #f1f5f9;
-    --editor-bg: #020617;
-    --editor-text: #f8fafc;
-    --tab-bg: #0f172a;
-    --tab-active: #4f46e5;
-    --input-bg: #1e293b;
-    --input-text: #f8fafc;
+    --app-bg: #090d16;
+    --app-header-bg: #111827;
+    --app-text: #f1f5f9;
+    --app-border: rgba(255, 255, 255, 0.08);
+    --app-input-bg: #1f2937;
+    --app-input-text: #f1f5f9;
+    --app-tab-bg: #111827;
+    --app-tab-active-bg: #1f2937;
+    --app-editor-bg: #0d1117;
+    --app-editor-text: #f1f5f9;
+    --app-glass-bg: rgba(17, 24, 39, 0.85);
+    --app-glass-border: rgba(6, 180, 212, 0.2);
+    
+    /* Legacy variables overrides */
+    --dark-bg: var(--app-bg);
+    --light-bg: #0d1117;
+    --border-color: var(--app-border);
+    --glass-bg: var(--app-glass-bg);
+    --glass-border: var(--app-glass-border);
+    --text-color: var(--app-text);
+    --editor-bg: var(--app-editor-bg);
+    --editor-text: var(--app-editor-text);
+    --tab-bg: var(--app-tab-bg);
+    --tab-active: var(--primary-color);
+    --input-bg: var(--app-input-bg);
+    --input-text: var(--app-input-text);
 }
 
 * {
@@ -37,8 +70,8 @@
 
 body {
     font-family: 'Outfit', sans-serif;
-    background: var(--dark-bg);
-    color: var(--text-color);
+    background: var(--app-bg);
+    color: var(--app-text);
     height: 100vh;
     overflow: hidden;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -46,34 +79,36 @@ body {
 
 /* Night Mode Specific */
 .night-mode body {
-    background: var(--dark-bg);
+    background: var(--app-bg);
 }
 
 .night-mode .frontend-header {
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-    border-bottom: 1px solid #2a2a3a;
+    background: var(--app-header-bg);
+    border-bottom: 1px solid var(--app-border);
 }
 
 .frontend-header {
-    background: var(--glass-bg);
+    background: var(--app-header-bg);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    color: white;
+    color: var(--app-text);
     padding: 0 24px;
     height: var(--header-height);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-    border-bottom: 1px solid var(--glass-border);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.03);
+    border-bottom: 1px solid var(--app-border);
     position: relative;
     z-index: 1000;
+    transition: all 0.3s ease;
 }
 
 .header-left h1 {
     font-size: 1.5rem;
     font-weight: 600;
-    color: white;
+    color: var(--app-text);
+    transition: all 0.3s ease;
 }
 
 .header-right {
@@ -84,9 +119,9 @@ body {
 
 /* Night Mode Input */
 .night-input {
-    background: var(--input-bg);
-    color: var(--input-text);
-    border: 1px solid #3a3a4a;
+    background: var(--app-input-bg);
+    color: var(--app-input-text);
+    border: 1px solid var(--app-border);
     border-radius: 8px;
     padding: 10px 15px;
     font-size: 14px;
@@ -96,8 +131,8 @@ body {
 
 .night-input:focus {
     outline: none;
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
 }
 
 .night-input::placeholder {
@@ -149,15 +184,49 @@ body {
 }
 
 .btn-secondary {
-    background: rgba(255, 255, 255, 0.1);
-    color: white;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: var(--app-glass-bg);
+    color: var(--app-text);
+    border: 1px solid var(--app-glass-border);
     backdrop-filter: blur(10px);
+    box-shadow: var(--shadow-sm);
 }
 
 .btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: var(--app-tab-bg);
+    color: var(--app-text);
     transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+#theme-toggle {
+    border-radius: 20px;
+    padding: 8px 18px;
+    font-weight: 600;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+body:not(.night-mode) #theme-toggle {
+    background: linear-gradient(135deg, #ffffff 0%, #fef08a 100%);
+    border: 1px solid #facc15;
+    color: #854d0e;
+    box-shadow: 0 2px 8px rgba(250, 204, 21, 0.15);
+}
+
+body:not(.night-mode) #theme-toggle:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(250, 204, 21, 0.3);
+}
+
+body.night-mode #theme-toggle {
+    background: linear-gradient(135deg, #1e1b4b 0%, #311042 100%);
+    border: 1px solid #818cf8;
+    color: #c7d2fe;
+    box-shadow: 0 2px 8px rgba(129, 140, 248, 0.1);
+}
+
+body.night-mode #theme-toggle:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(129, 140, 248, 0.3);
 }
 
 .btn-login {

@@ -203,18 +203,13 @@
         let currentInputLine = '';
         let inputPrompt = '';
 
-        var editor = CodeMirror.fromTextArea(document.getElementById("code"), {
-            mode: "text/x-c++src",
-            theme: "material-darker",
-            lineNumbers: true,
-            autoCloseBrackets: true,
-            extraKeys: { "Ctrl-Space": "autocomplete" },
-            lint: {
-                getAnnotations: CodeMirror.asyncLint,
-                async: true
-            },
-            gutters: ["CodeMirror-lint-markers"]
-        });
+        const languageModes = {
+            'c': { mode: 'text/x-csrc', lang: 'C' },
+            'c++': { mode: 'text/x-c++src', lang: 'Cpp' },
+            'java': { mode: 'text/x-java', lang: 'Java' },
+            'python': { mode: 'text/x-python', lang: 'Python' }
+        };
+        let selectedLanguage = 'Cpp';
 
         // Custom Linting Logic
         CodeMirror.asyncLint = function (content, update, options, cm) {
@@ -238,6 +233,19 @@
                     update(cm, []);
                 });
         };
+
+        var editor = CodeMirror.fromTextArea(document.getElementById("code"), {
+            mode: "text/x-c++src",
+            theme: "material-darker",
+            lineNumbers: true,
+            autoCloseBrackets: true,
+            extraKeys: { "Ctrl-Space": "autocomplete" },
+            lint: {
+                getAnnotations: CodeMirror.asyncLint,
+                async: true
+            },
+            gutters: ["CodeMirror-lint-markers"]
+        });
 
         // Autocomplete on type
         editor.on("keyup", function (cm, event) {
@@ -298,14 +306,6 @@
         const savePopupName = document.getElementById('save-popup-name');
         const savePopupButton = document.getElementById('save-popup-button');
         const closePopup = document.querySelector('.popup-close');
-
-        const languageModes = {
-            'c': { mode: 'text/x-csrc', lang: 'C' },
-            'c++': { mode: 'text/x-c++src', lang: 'Cpp' },
-            'java': { mode: 'text/x-java', lang: 'Java' },
-            'python': { mode: 'text/x-python', lang: 'Python' }
-        };
-        let selectedLanguage = 'Cpp';
 
         const updateTheme = (isDark) => {
             const editorTheme = isDark ? 'material-darker' : 'solarized';

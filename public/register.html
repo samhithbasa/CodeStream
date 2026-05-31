@@ -1,43 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Register</title>
-    <link rel="stylesheet" href="css/register.css">
-    <link rel="stylesheet" href="css/toast.css">
+    <title>Redirecting to Register...</title>
+    <script>
+        // Immediately redirect to the merged 3D login/register page with register mode enabled
+        const urlParams = new URLSearchParams(window.location.search);
+        let redirectUrl = 'login.html?mode=register';
+        // Preserve any URL parameters (like redirect parameter)
+        urlParams.forEach((value, key) => {
+            if (key !== 'mode') {
+                redirectUrl += `&${key}=${encodeURIComponent(value)}`;
+            }
+        });
+        window.location.replace(redirectUrl);
+    </script>
 </head>
-
 <body>
-    <div class="container">
-        <h2>Register</h2>
-        <form id="registerForm">
-            <input type="email" name="email" id="email" placeholder="Email (e.g. you@gmail.com)" required
-                pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
-                title="Enter a valid email (e.g. name@gmail.com)">
-            <input type="password" name="emailPassword" id="emailPassword"
-                placeholder="Email Password (for verification)" required>
-            <input type="password" name="loginPassword" id="loginPassword"
-                placeholder="Login Password (min 8 characters)" required>
-
-            <div id="otpSection" style="display: none;">
-                <input type="text" id="otp" placeholder="Enter OTP" required maxlength="6">
-                <div id="otpTimer" class="otp-timer"></div>
-                <div id="resendOtp" class="resend-otp">Resend OTP</div>
-                <button type="button" id="verifyOtp">Verify OTP</button>
-            </div>
-
-            <button type="button" id="getOtp">Get OTP</button>
-        </form>
-        <div id="message" class="message"></div>
-        <div class="login-link">
-            Already have an account? <a href="/login.html">Login here</a>
-        </div>
-    </div>
-    <script src="js/register.js"></script>
-    <script src="js/toast.js"></script>
-    <script src="js/sparkle.js"></script>
+    <p style="font-family: system-ui, sans-serif; text-align: center; margin-top: 50px; color: #666;">
+        Redirecting you to the registration page... If you are not redirected, <a href="login.html?mode=register">click here</a>.
+    </p>
 </body>
-
 </html>

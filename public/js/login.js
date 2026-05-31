@@ -425,3 +425,44 @@ if (document.readyState === 'loading') {
 } else {
     applyTokenFromUrlAndShowPopup();
 }
+
+// ── 3D Card Flip Toggle Logic ──────────────────────────────────────
+(function initCardFlip() {
+    const authCard = document.getElementById('authCard');
+    const toRegisterBtn = document.getElementById('dont');
+    const toLoginBtn = document.getElementById('toLogin');
+
+    if (toRegisterBtn && authCard) {
+        toRegisterBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            authCard.classList.add('flipped');
+        });
+    }
+
+    if (toLoginBtn && authCard) {
+        toLoginBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            authCard.classList.remove('flipped');
+        });
+    }
+
+    // Auto-flip if ?mode=register is present in the URL
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('mode') === 'register' && authCard) {
+        // Small delay so the page renders first, then flip
+        setTimeout(() => {
+            authCard.classList.add('flipped');
+        }, 100);
+    }
+
+    // Inject shake animation for failed OTP
+    const shakeStyle = document.createElement('style');
+    shakeStyle.textContent = `
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+            20%, 40%, 60%, 80% { transform: translateX(4px); }
+        }
+    `;
+    document.head.appendChild(shakeStyle);
+})();

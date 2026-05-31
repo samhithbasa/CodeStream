@@ -1,49 +1,49 @@
-/* ===== Root Variables ===== */
+/* ===== Root Variables (Light Theme Default) ===== */
 :root {
-    --modal-bg: #1E1E2E;
-    --bg-color: #1E1E2E;
-    --border-color: #444;
-    --input-bg: #2A2A3C;
-    --text-color: #F8F8F2;
-    --header-bg: #161621;
-    --accent-1: #00D4FF;
-    --accent-2: #FF2A6D;
-    --accent-3: #05D9E8;
-    --code-bg: #252536;
-    --accent-danger: #FF2A6D;
-    --accent-success: #72F1B8;
-    --accent-warning: #FFE66D;
+    --modal-bg: #ffffff;
+    --bg-color: #f1f5f9;
+    --border-color: #cbd5e1;
+    --input-bg: #ffffff;
+    --text-color: #0f172a;
+    --header-bg: #ffffff;
+    --accent-1: #4f46e5;       /* Premium Indigo */
+    --accent-2: #ef4444;       /* Coral/Red */
+    --accent-3: #0ea5e9;       /* Sky Blue */
+    --code-bg: #f8fafc;
+    --accent-danger: #ef4444;
+    --accent-success: #10b981;
+    --accent-warning: #f59e0b;
     --border-radius: 8px;
     --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    --enter-name: rgba(248, 248, 242, 0.6);
-    --glass-bg: rgba(30, 30, 46, 0.95);
+    --enter-name: rgba(15, 23, 42, 0.5);
+    --glass-bg: rgba(255, 255, 255, 0.85);
     --space-lg: 1.5rem;
-    --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.3), 0 10px 10px rgba(0, 0, 0, 0.1);
-    --glass-border: rgba(0, 212, 255, 0.2);
-    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+    --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.05), 0 10px 10px rgba(0, 0, 0, 0.02);
+    --glass-border: rgba(79, 70, 229, 0.12);
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.02);
     --space-xs: 0.5rem;
-    --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
     --header-height: 70px;
 }
 
+/* ===== Dark Cyber Theme Overrides ===== */
 .dark-theme {
-    --modal-bg: #1E1E2E;
-    --bg-color: #1E1E2E;
-    --text-color: #F8F8F2;
-    --header-bg: #161621;
-    --accent-1: #00D4FF;
-    --accent-2: #FF2A6D;
-    --accent-3: #05D9E8;
-    --code-bg: #252536;
-    --accent-danger: #FF2A6D;
-    --accent-success: #72F1B8;
-    --accent-warning: #FFE66D;
-    --enter-name: rgba(248, 248, 242, 0.6);
-    --border-color: #555;
-    --input-bg: #2A2A3C;
-    --glass-bg: rgba(22, 22, 33, 0.95);
+    --modal-bg: #111827;
+    --bg-color: #0b0f19;
+    --text-color: #f1f5f9;
+    --header-bg: #111827;
+    --accent-1: #06b6d4;       /* Cyber Cyan */
+    --accent-2: #ff2a6d;       /* Cyber Pink/Red */
+    --accent-3: #00d4ff;
+    --code-bg: #090d16;
+    --accent-danger: #ff2a6d;
+    --accent-success: #72f1b8;
+    --accent-warning: #ffe66d;
+    --enter-name: rgba(241, 245, 249, 0.6);
+    --border-color: rgba(99, 102, 241, 0.2);
+    --input-bg: #1f2937;
+    --glass-bg: rgba(17, 24, 39, 0.95);
     --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.4), 0 10px 10px rgba(0, 0, 0, 0.2);
-    --glass-border: rgba(0, 212, 255, 0.15);
+    --glass-border: rgba(6, 180, 212, 0.15);
     --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
@@ -192,21 +192,31 @@ header #logo:hover {
     height: 38px;
     width: 38px;
     cursor: pointer;
-    padding: var(--space-xs);
+    padding: 8px;
     border-radius: 50%;
-    transition: var(--transition);
-    background-color: rgba(0, 212, 255, 0.1);
-    border: 1px solid rgba(0, 212, 255, 0.2);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: rgba(79, 70, 229, 0.08);
+    border: 1px solid rgba(79, 70, 229, 0.15);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
 }
 
 #moon:hover {
-    transform: scale(1.1) rotate(15deg);
-    background-color: rgba(0, 212, 255, 0.2);
-    box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+    transform: scale(1.1) rotate(45deg);
+    background: rgba(79, 70, 229, 0.15);
+    border-color: rgba(79, 70, 229, 0.3);
+    box-shadow: 0 0 15px rgba(79, 70, 229, 0.25);
 }
 
 .dark-theme #moon {
-    background-color: rgba(0, 212, 255, 0.15);
+    background: rgba(6, 182, 212, 0.1);
+    border: 1px solid rgba(6, 182, 212, 0.2);
+    box-shadow: 0 0 10px rgba(6, 182, 212, 0.15);
+}
+
+.dark-theme #moon:hover {
+    background: rgba(6, 182, 212, 0.2);
+    border-color: rgba(6, 182, 212, 0.4);
+    box-shadow: 0 0 20px rgba(6, 182, 212, 0.4);
 }
 
 #saved-codes-popup {
@@ -788,48 +798,59 @@ section .icons img:hover {
 }
 
 /* ===== CodeMirror Themes ===== */
-.cm-s-solarized .CodeMirror {
-    background: #1E1E2E;
-    color: #F8F8F2;
+/* Solarized Light Theme (For Light Mode) */
+body:not(.dark-theme) .cm-s-solarized.CodeMirror {
+    background: #fdf6e3;
+    color: #657b83;
 }
 
-.cm-s-solarized .CodeMirror-gutters {
-    background: #161621;
-    border-right: 1px solid rgba(0, 212, 255, 0.3);
+body:not(.dark-theme) .cm-s-solarized .CodeMirror-gutters {
+    background: #eee8d5;
+    border-right: 1px solid #cbd5e1;
 }
 
-.cm-s-solarized .cm-keyword {
-    color: #FF2A6D;
+body:not(.dark-theme) .cm-s-solarized .CodeMirror-linenumber {
+    color: #93a1a1;
 }
 
-.cm-s-solarized .cm-string {
-    color: #72F1B8;
+/* Custom coloring for keywords/types inside solarized if desired */
+body:not(.dark-theme) .cm-s-solarized .cm-keyword {
+    color: #cb4b16;
 }
 
-.cm-s-solarized .cm-number {
-    color: #FFE66D;
+body:not(.dark-theme) .cm-s-solarized .cm-string {
+    color: #859900;
 }
 
-.cm-s-material-darker .CodeMirror {
-    background: #1E1E2E;
-    color: #F8F8F2;
+body:not(.dark-theme) .cm-s-solarized .cm-number {
+    color: #d33682;
 }
 
-.cm-s-material-darker .CodeMirror-gutters {
-    background: #161621;
-    border-right: 1px solid rgba(0, 212, 255, 0.3);
+/* Material Darker Theme (For Dark Mode) */
+body.dark-theme .cm-s-material-darker.CodeMirror {
+    background: #090d16;
+    color: #f1f5f9;
 }
 
-.cm-s-material-darker .cm-keyword {
-    color: #FF2A6D;
+body.dark-theme .cm-s-material-darker .CodeMirror-gutters {
+    background: #111827;
+    border-right: 1px solid rgba(6, 180, 212, 0.2);
 }
 
-.cm-s-material-darker .cm-string {
-    color: #72F1B8;
+body.dark-theme .cm-s-material-darker .CodeMirror-linenumber {
+    color: #4b5563;
 }
 
-.cm-s-material-darker .cm-number {
-    color: #FFE66D;
+body.dark-theme .cm-s-material-darker .cm-keyword {
+    color: #ff2a6d;
+}
+
+body.dark-theme .cm-s-material-darker .cm-string {
+    color: #72f1b8;
+}
+
+body.dark-theme .cm-s-material-darker .cm-number {
+    color: #ffe66d;
 }
 
 /* ===== Modal Dialogs ===== */

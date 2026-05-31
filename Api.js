@@ -27,7 +27,7 @@ app.set('trust proxy', 1);
 // Security and Privacy Headers Middleware
 app.use((req, res, next) => {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' ws: wss: https://accounts.google.com; frame-src 'self' https://accounts.google.com; object-src 'none'; worker-src 'self' blob:; child-src 'self' blob:;");
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://unpkg.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' ws: wss: https://accounts.google.com; frame-src 'self' https://accounts.google.com; object-src 'none'; worker-src 'self' blob:; child-src 'self' blob:;");
     res.setHeader('X-Frame-Options', 'SAMEORIGIN');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -191,7 +191,7 @@ async function sendEmailResend(to, subject, htmlContent) {
     if (!apiKey) throw new Error('RESEND_API_KEY is not defined');
 
     const data = JSON.stringify({
-        from: 'onboarding@resend.dev',
+        from: 'CodeStream <onboarding@resend.dev>',
         to: to,
         subject: subject,
         html: htmlContent
@@ -665,7 +665,12 @@ app.post('/api/contact', async (req, res) => {
             `
         );
 
-        await sendEmail(email, `Ticket Created: ${ticket.ticketId}`, emailHtml);
+        try {
+            await sendEmail(email, `Ticket Created: ${ticket.ticketId}`, emailHtml);
+            console.log(`[API] Contact ticket confirmation email sent to ${email}`);
+        } catch (emailError) {
+            console.error(`[API] Contact ticket confirmation email failed: ${emailError.message}`);
+        }
 
         res.json({
             success: true,
@@ -814,9 +819,22 @@ app.post('/send-otp', otpLimiter, async (req, res) => {
             `
         );
 
-        await sendEmail(email, 'Your OTP for Registration', emailHtml);
-        console.log('Email sent successfully to:', email);
-        res.json({ message: 'OTP sent successfully' });
+        try {
+            await sendEmail(email, 'Your OTP for Registration', emailHtml);
+            console.log('Email sent successfully to:', email);
+            res.json({ message: 'OTP sent successfully' });
+        } catch (emailError) {
+            console.warn(`[API] Email send failed: ${emailError.message}`);
+            console.log('\n==================================================');
+            console.log(`[SANDBOX OTP FALLBACK]`);
+            console.log(`To: ${email}`);
+            console.log(`OTP Code: ${otp}`);
+            console.log('==================================================\n');
+            res.json({
+                message: 'OTP generated successfully. (Check server logs if using unverified Resend sandbox email!)',
+                simulated: true
+            });
+        }
     } catch (error) {
         console.error('Email sending error details:', {
             message: error.message,
@@ -1105,11 +1123,25 @@ app.post('/forgot-password', passwordResetLimiter, async (req, res) => {
             resetLink
         );
 
-        await sendEmail(email, 'Password Reset Request', emailHtml);
-        res.json({
-            message: 'Password reset email sent',
-            token
-        });
+        try {
+            await sendEmail(email, 'Password Reset Request', emailHtml);
+            res.json({
+                message: 'Password reset email sent',
+                token
+            });
+        } catch (emailError) {
+            console.warn(`[API] Password reset email send failed: ${emailError.message}`);
+            console.log('\n==================================================');
+            console.log(`[SANDBOX PASSWORD RESET FALLBACK]`);
+            console.log(`To: ${email}`);
+            console.log(`Reset Link: ${resetLink}`);
+            console.log('==================================================\n');
+            res.json({
+                message: 'Password reset link generated (Check server logs if using unverified Resend sandbox email!)',
+                token,
+                simulated: true
+            });
+        }
     } catch (error) {
         console.error('Forgot Password Error:', error);
         res.status(500).json({ error: 'Failed to process password reset' });

@@ -6,40 +6,94 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login Form</title>
   <link rel="stylesheet" href="css/login.css">
+  <link rel="stylesheet" href="css/register.css">
   <link rel="stylesheet" href="css/toast.css">
   <script src="https://cdn.jsdelivr.net/npm/js-cookie@3.0.1/dist/js.cookie.min.js"></script>
 </head>
 
 <body>
-  <div class="login-container">
-    <h2>Login</h2>
+  <div class="auth-viewport">
+    <div class="auth-card" id="authCard">
+      <!-- FRONT FACE (LOGIN) -->
+      <div class="card-front login-container">
+        <h2>Login</h2>
 
-    <!-- Regular login form -->
-    <form id="loginForm">
-      <input type="email" id="email" name="email" placeholder="Email" required>
-      <input type="password" id="password" name="password" placeholder="Password" required>
-      <button type="submit">Login</button>
-    </form>
+        <form id="loginForm">
+          <input type="email" id="email" name="email" placeholder="Email" required>
+          <input type="password" id="password" name="password" placeholder="Password" required>
+          <button type="submit">Login</button>
+        </form>
 
-    <div class="divider">
-      <span class="divider-text">OR</span>
-    </div>
+        <div class="divider">
+          <span class="divider-text">OR</span>
+        </div>
 
-    <!-- 🔹 Google OAuth Redirect Button -->
-    <button id="googleLoginBtn" class="google-btn">
-      <img src="../images/goggle.png" alt="Google Logo">
-      Sign in with Google
-    </button>
+        <button id="googleLoginBtn" class="google-btn">
+          <img src="../images/goggle.png" alt="Google Logo">
+          Sign in with Google
+        </button>
 
+        <div class="auth-links">
+          <a href="#" id="forgotPassword">Forgot Password?</a>
+          <div class="register-link">
+            Don't have an account? <a href="#" id="dont">Register here</a>
+          </div>
+        </div>
 
-    <div class="auth-links">
-      <a href="#" id="forgotPassword">Forgot Password?</a>
-      <div class="register-link">
-        Don't have an account? <a href="/register.html" id="dont">Register here</a>
+        <div id="message" class="message"></div>
+      </div>
+
+      <!-- BACK FACE (REGISTER) -->
+      <div class="card-back register-container">
+        <h2>Register</h2>
+
+        <form id="registerForm">
+          <input type="email" name="email" id="registerEmail" placeholder="Email (e.g. you@gmail.com)" required
+            pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}" title="Enter a valid email (e.g. name@gmail.com)">
+          <input type="password" name="emailPassword" id="registerEmailPassword"
+            placeholder="Email Password (for verification)" required>
+          <input type="password" name="loginPassword" id="registerLoginPassword"
+            placeholder="Login Password (min 8 characters)" required>
+
+          <button type="button" id="getOtp">Get OTP</button>
+
+          <div id="otpSection" style="display: none;">
+            <div id="otpTimer" class="otp-timer"></div>
+
+            <div class="otp-inputs-wrapper">
+              <div class="otp-inputs" id="otpInputs">
+                <input type="text" class="otp-digit" maxlength="1" required>
+                <input type="text" class="otp-digit" maxlength="1" required>
+                <input type="text" class="otp-digit" maxlength="1" required>
+                <input type="text" class="otp-digit" maxlength="1" required>
+                <input type="text" class="otp-digit" maxlength="1" required>
+                <input type="text" class="otp-digit" maxlength="1" required>
+              </div>
+              <div class="otp-success-badge" id="otpSuccessBadge" style="display: none;">
+                <svg class="checkmark-svg" viewBox="0 0 52 52">
+                  <circle class="checkmark-circle" cx="26" cy="26" r="25" fill="none" />
+                  <path class="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8" />
+                </svg>
+              </div>
+            </div>
+
+            <!-- Hidden field to bridge standard JS OTP lookup -->
+            <input type="hidden" id="otp" required>
+
+            <div id="resendOtp" class="resend-otp">Resend OTP</div>
+            <button type="button" id="verifyOtp">Verify OTP</button>
+          </div>
+        </form>
+
+        <div class="auth-links">
+          <div class="login-link">
+            Already have an account? <a href="#" id="toLogin">Login here</a>
+          </div>
+        </div>
+
+        <div id="registerMessage" class="message"></div>
       </div>
     </div>
-
-    <div id="message" class="message"></div>
   </div>
 
   <script>
@@ -116,6 +170,7 @@
       window.location.href = authUrl;
     });
   </script>
+  <script src="js/register.js"></script>
   <script src="js/login.js"></script>
   <script src="js/toast.js"></script>
   <script src="js/sparkle.js"></script>
