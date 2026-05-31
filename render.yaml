@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: memory-update
+    name: codestream-94ss
     runtime: docker
     plan: free
     region: ohio

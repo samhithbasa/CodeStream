@@ -23,6 +23,18 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const app = express();
 app.set('trust proxy', 1);
+
+// Security and Privacy Headers Middleware
+app.use((req, res, next) => {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' ws: wss: https://accounts.google.com; frame-src 'self' https://accounts.google.com; object-src 'none'; worker-src 'self' blob:; child-src 'self' blob:;");
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+    next();
+});
+
 const PORT = process.env.PORT || 3000;
 
 const ADMIN_EMAILS = [
