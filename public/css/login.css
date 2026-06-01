@@ -1,12 +1,118 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* Dynamic Vibe-Coder Styling */
+:root {
+  --bg-color: #f5eedc;
+  --text-color: #212529;
+  --accent-color: #4361ee;
+  --accent-hover: #3a56d4;
+  --card-bg: rgba(255, 255, 255, 0.65);
+  --card-border: rgba(67, 97, 238, 0.15);
+  --input-bg: rgba(255, 255, 255, 0.85);
+  --input-border: rgba(67, 97, 238, 0.15);
+  --input-text: #121212;
+  --btn-bg: linear-gradient(135deg, #4361ee, #3a56d4);
+  --shadow: 0 15px 35px rgba(0, 0, 0, 0.05),
+            0 0 15px rgba(67, 97, 238, 0.05),
+            inset 0 0 15px rgba(255, 255, 255, 0.5);
+  --border-glow: rgba(67, 97, 238, 0.25);
+  --link-color: #4361ee;
+  --link-hover: #3a56d4;
+  --divider-color: rgba(33, 37, 41, 0.12);
+  --text-muted: #6c757d;
+  --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+:root.dark-theme,
+body.dark-theme,
+.dark-theme {
+  --bg-color: #121212;
+  --text-color: #e9ecef;
+  --accent-color: #4895ef;
+  --accent-hover: #3a7bc8;
+  --card-bg: rgba(20, 24, 33, 0.65);
+  --card-border: rgba(72, 149, 239, 0.2);
+  --input-bg: rgba(33, 37, 41, 0.85);
+  --input-border: rgba(72, 149, 239, 0.15);
+  --input-text: #f5eedc;
+  --btn-bg: linear-gradient(135deg, #4895ef, #3a7bc8);
+  --shadow: 0 15px 35px rgba(0, 0, 0, 0.3),
+            0 0 15px rgba(72, 149, 239, 0.1),
+            inset 0 0 15px rgba(255, 255, 255, 0.03);
+  --border-glow: rgba(72, 149, 239, 0.3);
+  --link-color: #4895ef;
+  --link-hover: #64b5f6;
+  --divider-color: rgba(255, 255, 255, 0.12);
+  --text-muted: #adb5bd;
+}
+
 body {
-  background: url('../images/login.jpeg') no-repeat center center fixed;
-  background-size: cover;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   display: flex;
   justify-content: center;
   align-items: center;
   height: 100vh;
   margin: 0;
-  font-family: Arial, sans-serif;
+  overflow: hidden;
+  position: relative;
+  transition: var(--transition);
+}
+
+/* Animated perspective grid background */
+body::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background-image: 
+      linear-gradient(rgba(67, 97, 238, 0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(67, 97, 238, 0.08) 1px, transparent 1px);
+  background-size: 50px 50px;
+  transform: rotateX(60deg) translateY(0);
+  z-index: -2;
+  pointer-events: none;
+  transform-origin: center;
+  animation: grid-glide 25s linear infinite;
+  opacity: 0.8;
+}
+
+:root.dark-theme body::before,
+body.dark-theme::before,
+.dark-theme body::before {
+  background-image: 
+      linear-gradient(rgba(72, 149, 239, 0.12) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(72, 149, 239, 0.12) 1px, transparent 1px);
+}
+
+@keyframes grid-glide {
+  from {
+      transform: rotateX(60deg) translateY(0);
+  }
+  to {
+      transform: rotateX(60deg) translateY(100px);
+  }
+}
+
+body::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at 50% 50%, rgba(67, 97, 238, 0.12) 0%, transparent 70%);
+  z-index: -1;
+  pointer-events: none;
+}
+
+:root.dark-theme body::after,
+body.dark-theme::after,
+.dark-theme body::after {
+  background: radial-gradient(circle at 50% 50%, rgba(72, 149, 239, 0.18) 0%, transparent 60%);
 }
 
 .auth-viewport {
@@ -15,6 +121,7 @@ body {
   height: 640px;
   position: relative;
   margin: 0 auto;
+  z-index: 10;
 }
 
 .auth-card {
@@ -38,22 +145,20 @@ body {
   height: 100%;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
-  border-radius: 15px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  background: rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3),
-              0 0 15px rgba(0, 255, 255, 0.15),
-              inset 0 0 15px rgba(255, 255, 255, 0.1);
-  padding: 40px 45px;
+  box-shadow: var(--shadow);
+  padding: 45px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  color: white;
+  color: var(--text-color);
   text-align: center;
-  transition: all 0.3s ease;
+  transition: all 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 .card-back {
@@ -63,31 +168,49 @@ body {
 /* Glassmorphism hover glow effect */
 .auth-viewport:hover .card-front,
 .auth-viewport:hover .card-back {
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4),
-              0 0 25px rgba(0, 255, 255, 0.3),
-              inset 0 0 20px rgba(255, 255, 255, 0.2);
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.1),
+              0 0 25px var(--border-glow),
+              inset 0 0 20px rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+:root.dark-theme .auth-viewport:hover .card-front,
+:root.dark-theme .auth-viewport:hover .card-back,
+body.dark-theme .auth-viewport:hover .card-front,
+body.dark-theme .auth-viewport:hover .card-back,
+.dark-theme .auth-viewport:hover .card-front,
+.dark-theme .auth-viewport:hover .card-back {
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.4),
+              0 0 25px var(--border-glow),
+              inset 0 0 20px rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 /* Outer neon blur border animation */
 .auth-viewport::before {
   content: '';
   position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border-radius: 22px;
+  background: linear-gradient(45deg, var(--accent-color), var(--accent-hover), var(--accent-color));
+  background-size: 200% 200%;
+  z-index: -1;
+  opacity: 0.35;
+  filter: blur(4px);
+  animation: shine 4s linear infinite;
+  transition: var(--transition);
+}
+
+.auth-viewport:hover::before {
+  opacity: 0.7;
+  filter: blur(8px);
   top: -4px;
   left: -4px;
   right: -4px;
   bottom: -4px;
-  border-radius: 19px;
-  background: linear-gradient(45deg, #00ffff, #0088ff, #00ffff);
-  background-size: 200% 200%;
-  z-index: -1;
-  opacity: 0.5;
-  filter: blur(5px);
-  animation: shine 3s linear infinite;
-}
-
-.auth-viewport:hover::before {
-  opacity: 0.9;
-  filter: blur(8px);
 }
 
 @keyframes shine {
@@ -97,7 +220,12 @@ body {
 
 .login-container h2,
 .register-container h2 {
-  margin-bottom: 20px;
+  font-weight: 700;
+  font-size: 28px;
+  margin-bottom: 25px;
+  letter-spacing: -0.5px;
+  color: var(--text-color);
+  margin-top: 0;
 }
 
 .login-container input,
@@ -105,138 +233,185 @@ body {
 .register-container input,
 .register-container button {
   width: 100%;
-  padding: 10px;
-  border: none;
-  border-radius: 5px;
-  font-size: 16px;
-  margin-bottom: 20px;
+  height: 48px;
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  font-size: 15px;
+  margin-bottom: 18px;
   box-sizing: border-box;
+  font-family: inherit;
+  transition: var(--transition);
 }
 
 .login-container input,
 .register-container input {
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--input-bg);
+  color: var(--input-text);
+  padding: 0 16px;
+}
+
+.login-container input::placeholder,
+.register-container input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
+.login-container input:focus,
+.register-container input:focus {
+  background: var(--input-bg);
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px var(--border-glow);
+  outline: none;
 }
 
 .login-container button,
 .register-container button {
-  background: linear-gradient(45deg, #3498db, #2c3e50);
+  background: var(--btn-bg);
   color: white;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s;
+  border: none;
+  margin-top: 5px;
+  box-shadow: 0 4px 12px rgba(67, 97, 238, 0.15);
+}
+
+.login-container button:hover,
+.register-container button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px var(--border-glow);
+  filter: brightness(1.05);
+}
+
+.login-container button:active,
+.register-container button:active {
+  transform: translateY(0);
 }
 
 #dont,
 #forgotPassword {
-  color: #00ffff;
+  color: var(--link-color);
+  font-weight: 500;
+  transition: var(--transition);
 }
 
 #dont:hover,
 #forgotPassword:hover {
-  color: greenyellow;
+  color: var(--link-hover);
+  text-decoration: underline;
 }
 
 .auth-links {
   margin-top: 15px;
   text-align: center;
+  font-size: 14px;
+  color: var(--text-muted);
 }
 
 .auth-links a {
-  color: #4facfe;
+  color: var(--link-color);
   text-decoration: none;
   margin: 0 10px;
-  font-size: 14px;
+  transition: var(--transition);
 }
 
 .auth-links a:hover {
+  color: var(--link-hover);
   text-decoration: underline;
 }
 
+.register-link,
+.login-link {
+  margin-top: 12px;
+}
+
+.message {
+  padding: 12px;
+  margin: 15px 0;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 500;
+}
+
 .message.success {
-  color: #28a745;
-  background-color: #d4edda;
-  border: 1px solid #c3e6cb;
+  color: #155724;
+  background-color: rgba(40, 167, 69, 0.15);
+  border: 1px solid rgba(40, 167, 69, 0.25);
 }
 
 .message.error {
-  color: #dc3545;
-  background-color: #f8d7da;
-  border: 1px solid #f5c6cb;
+  color: #721c24;
+  background-color: rgba(220, 53, 69, 0.15);
+  border: 1px solid rgba(220, 53, 69, 0.25);
+}
+
+:root.dark-theme .message.success,
+body.dark-theme .message.success,
+.dark-theme .message.success {
+  color: #51cf66;
+}
+
+:root.dark-theme .message.error,
+body.dark-theme .message.error,
+.dark-theme .message.error {
+  color: #ff6b6b;
 }
 
 .divider {
   display: flex;
   align-items: center;
-  margin: 16px 0;
+  margin: 20px 0;
 }
 
 .divider::before,
 .divider::after {
   content: "";
   flex: 1;
-  border-bottom: 1px solid #dadce0;
+  border-bottom: 1px solid var(--divider-color);
 }
 
 .divider-text {
-  padding: 0 10px;
-  color: #5f6368;
-  font-size: 14px;
+  padding: 0 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .google-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
-  background: rgba(255, 255, 255, 0.25);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  backdrop-filter: blur(10px);
-  padding: 12px;
-  border-radius: 8px;
-  font-weight: 500;
-  letter-spacing: 0.3px;
+  height: 48px;
+  background: var(--input-bg);
+  color: var(--text-color);
+  border: 1px solid var(--input-border);
+  padding: 0;
+  border-radius: 10px;
+  font-weight: 600;
   font-size: 15px;
   cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 0 10px rgba(100, 200, 255, 0.3),
-              inset 0 0 5px rgba(255, 255, 255, 0.1);
+  font-family: inherit;
+  transition: var(--transition);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
 }
 
 .google-btn img {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   background: none;
 }
 
 .google-btn:hover {
-  background: rgba(255, 255, 255, 0.4);
-  transform: translateY(-2px);
-  box-shadow: 0 0 20px rgba(100, 200, 255, 0.6),
-              inset 0 0 10px rgba(255, 255, 255, 0.3);
+  background: var(--input-bg);
+  border-color: var(--accent-color);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px var(--border-glow);
 }
 
 .google-btn:active {
   transform: translateY(0);
-  background: rgba(255, 255, 255, 0.5);
-}
-
-/* Glassmorphism Input Focus Override */
-.card-front input,
-.card-back input {
-  background: rgba(255, 255, 255, 0.95);
-  color: #111;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 2px solid transparent;
-}
-
-.card-front input:focus,
-.card-back input:focus {
-  background: #ffffff;
-  outline: none;
-  border-color: #00ffff;
-  box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
 }
 
 /* OTP Styling */
@@ -265,17 +440,16 @@ body {
   font-size: 20px !important;
   font-weight: bold;
   border-radius: 8px !important;
-  border: 2px solid rgba(255, 255, 255, 0.3) !important;
-  background: rgba(255, 255, 255, 0.15) !important;
-  color: white !important;
+  border: 1px solid var(--input-border) !important;
+  background: var(--input-bg) !important;
+  color: var(--input-text) !important;
   margin-bottom: 0 !important;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
 .otp-digit:focus {
-  border-color: #00ffff !important;
-  background: rgba(255, 255, 255, 0.3) !important;
-  box-shadow: 0 0 10px rgba(0, 255, 255, 0.6) !important;
+  border-color: var(--accent-color) !important;
+  box-shadow: 0 0 0 3px var(--border-glow) !important;
   outline: none;
 }
 
@@ -368,6 +542,29 @@ body {
   }
 }
 
+.otp-timer {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-top: 8px;
+  font-weight: 500;
+}
+
+.resend-otp {
+  color: var(--link-color);
+  cursor: pointer;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 10px;
+  display: none;
+  transition: var(--transition);
+}
+
+.resend-otp:hover {
+  color: var(--link-hover);
+  text-decoration: underline;
+}
+
 /* Reset register.css .container visual box properties when used on registerForm form element */
 #registerForm.container {
   background: transparent !important;
@@ -385,7 +582,7 @@ body {
 }
 
 #registerForm.container input {
-  margin-bottom: 20px !important;
+  margin-bottom: 18px !important;
   box-sizing: border-box !important;
 }
 
