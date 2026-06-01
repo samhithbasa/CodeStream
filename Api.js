@@ -19,7 +19,7 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const { google } = require('googleapis');
 const url = require('url');
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const Groq = require("groq-sdk");
 
 const app = express();
 app.set('trust proxy', 1);
@@ -3133,48 +3133,26 @@ wss.on('connection', (ws) => {
 });
 
 // AI Provider Setup
-let currentGeminiKeyIndex = 0;
-function getNextGeminiKey() {
-    const keysString = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || '';
-    if (!keysString) return null;
-    const keys = keysString.split(',').map(k => k.trim()).filter(k => k);
-    if (keys.length === 0) return null;
-
-    // Round-robin rotation
-    const key = keys[currentGeminiKeyIndex];
-    currentGeminiKeyIndex = (currentGeminiKeyIndex + 1) % keys.length;
-    console.log(`[AI] Using API Key index: ${currentGeminiKeyIndex === 0 ? keys.length - 1 : currentGeminiKeyIndex - 1}`);
-    return key;
-}
+let currentGroqKeyIndex = 0;
 
 app.post('/api/ai/generate', async (req, res) => {
     try {
         const { prompt, context, mode, image } = req.body;
 
-        const keysString = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || '';
+        const keysString = process.env.GROQ_API_KEYS || process.env.GROQ_API_KEY || '';
         if (!keysString) {
-            return res.status(500).json({ error: 'AI capabilities are not configured (Missing API Key in .env)' });
+            return res.status(500).json({ error: 'AI capabilities are not configured (Missing GROQ_API_KEY in .env)' });
         }
         const keys = keysString.split(',').map(k => k.trim()).filter(k => k);
         if (keys.length === 0) {
-            return res.status(500).json({ error: 'AI capabilities are not configured (Missing API Key in .env)' });
+            return res.status(500).json({ error: 'AI capabilities are not configured (Missing GROQ_API_KEY in .env)' });
         }
 
         let systemInstruction = "";
         if (mode === 'frontend') {
-            systemInstruction = `You are a world-class Frontend Developer AI...`; // Your existing instruction
+            systemInstruction = "You are an expert frontend developer AI assistant directly integrated into a Web Playground. The user will provide their current HTML, CSS, and JS code as context. Answer their questions, provide UI/UX improvements, or generate code. Return code wrapped in markdown blocks.";
         } else {
-            systemInstruction = `You are a Senior Software Engineer AI...`; // Your existing instruction
-        }
-
-        const contents = [];
-        if (image && image.data && image.mimeType) {
-            contents.push({
-                inlineData: {
-                    data: image.data,
-                    mimeType: image.mimeType
-                }
-            });
+            systemInstruction = "You are an expert software engineer AI assistant directly integrated into an IDE. The user will provide their current C, C++, Java, Python, or JS code as context. Answer their questions, debug their code, or write code for them. Return code wrapped in markdown blocks.";
         }
 
         let userPrompt = prompt || 'Recreate this UI design exactly.';
@@ -3185,50 +3163,73 @@ app.post('/api/ai/generate', async (req, res) => {
         }
 
         const fullPrompt = `CURRENT CODE CONTEXT:\n${context || 'No code provided.'}\n\nUSER PROMPT:\n${userPrompt}`;
-        contents.push(fullPrompt);
+
+        const messages = [
+            { role: 'system', content: systemInstruction }
+        ];
+
+        if (image && image.data && image.mimeType) {
+            messages.push({
+                role: 'user',
+                content: [
+                    { type: 'text', text: fullPrompt },
+                    {
+                        type: 'image_url',
+                        image_url: {
+                            url: `data:${image.mimeType};base64,${image.data}`
+                        }
+                    }
+                ]
+            });
+        } else {
+            messages.push({
+                role: 'user',
+                content: fullPrompt
+            });
+        }
 
         let streamResult;
         let success = false;
         let lastError = null;
 
-        const startIndex = currentGeminiKeyIndex;
+        const startIndex = currentGroqKeyIndex;
         for (let i = 0; i < keys.length; i++) {
             const attemptIndex = (startIndex + i) % keys.length;
             const apiKey = keys[attemptIndex];
-            console.log(`[AI] Attempting AI generation with API Key index: ${attemptIndex}`);
+            console.log(`[AI] Attempting AI generation with Groq API Key index: ${attemptIndex}`);
+
+            const primaryModel = image ? "llama-3.2-90b-vision-preview" : "llama-3.3-70b-versatile";
+            const fallbackModel = image ? "llama-3.2-11b-vision-preview" : "llama-3.1-8b-instant";
 
             try {
-                const genAI = new GoogleGenerativeAI(apiKey);
-                const model = genAI.getGenerativeModel({
-                    model: "gemini-2.5-flash",
-                    systemInstruction: systemInstruction,
-                    generationConfig: {
-                        maxOutputTokens: 8192,
-                        temperature: 0.7,
-                    }
-                });
+                const groq = new Groq({ apiKey });
 
                 try {
-                    streamResult = await model.generateContentStream(contents);
+                    console.log(`[AI] Calling Groq with primary model: ${primaryModel}`);
+                    streamResult = await groq.chat.completions.create({
+                        messages: messages,
+                        model: primaryModel,
+                        temperature: 0.7,
+                        max_completion_tokens: 8192,
+                        stream: true
+                    });
                     success = true;
-                    currentGeminiKeyIndex = (attemptIndex + 1) % keys.length;
-                    console.log(`[AI] Successfully started generation with key index: ${attemptIndex}`);
+                    currentGroqKeyIndex = (attemptIndex + 1) % keys.length;
+                    console.log(`[AI] Successfully started generation with key index: ${attemptIndex} and model: ${primaryModel}`);
                     break;
                 } catch (streamError) {
-                    console.warn(`[AI] gemini-2.5-flash failed with key index ${attemptIndex}, attempting fallback to gemini-2.0-flash:`, streamError.message);
-                    
-                    const fallbackModel = genAI.getGenerativeModel({
-                        model: "gemini-2.0-flash",
-                        systemInstruction: systemInstruction,
-                        generationConfig: {
-                            maxOutputTokens: 8192,
-                            temperature: 0.7,
-                        }
+                    console.warn(`[AI] ${primaryModel} failed with key index ${attemptIndex}, attempting fallback to ${fallbackModel}:`, streamError.message);
+
+                    streamResult = await groq.chat.completions.create({
+                        messages: messages,
+                        model: fallbackModel,
+                        temperature: 0.7,
+                        max_completion_tokens: 8192,
+                        stream: true
                     });
-                    streamResult = await fallbackModel.generateContentStream(contents);
                     success = true;
-                    currentGeminiKeyIndex = (attemptIndex + 1) % keys.length;
-                    console.log(`[AI] Successfully started generation with fallback model and key index: ${attemptIndex}`);
+                    currentGroqKeyIndex = (attemptIndex + 1) % keys.length;
+                    console.log(`[AI] Successfully started generation with fallback model: ${fallbackModel} and key index: ${attemptIndex}`);
                     break;
                 }
             } catch (err) {
@@ -3238,7 +3239,7 @@ app.post('/api/ai/generate', async (req, res) => {
         }
 
         if (!success) {
-            throw lastError || new Error("All configured Gemini API keys failed.");
+            throw lastError || new Error("All configured Groq API keys failed.");
         }
 
         // Set up SSE streaming headers (only when we successfully got the streamResult)
@@ -3251,13 +3252,8 @@ app.post('/api/ai/generate', async (req, res) => {
         // parsing failures (e.g. "Failed to parse stream") are caught
         // gracefully instead of crashing the Node process.
         try {
-            for await (const chunk of streamResult.stream) {
-                let chunkText = '';
-                try {
-                    chunkText = chunk.text();
-                } catch (err) {
-                    console.warn('[AI] Error reading chunk text:', err.message);
-                }
+            for await (const chunk of streamResult) {
+                const chunkText = chunk.choices[0]?.delta?.content || '';
                 if (chunkText) {
                     res.write(`data: ${JSON.stringify({ token: chunkText })}\r\n\r\n`);
                     if (res.flush) res.flush();
@@ -3268,9 +3264,7 @@ app.post('/api/ai/generate', async (req, res) => {
             res.end();
         } catch (streamError) {
             console.error('[AI] Stream consumption error (server kept alive):', streamError.message || streamError);
-            const streamErrMsg = streamError.message?.includes('parse stream')
-                ? 'AI response stream was interrupted. Please try again.'
-                : `AI stream error: ${streamError.message || 'Unknown error'}`;
+            const streamErrMsg = `AI stream error: ${streamError.message || 'Unknown error'}`;
             try {
                 res.write(`data: ${JSON.stringify({ error: streamErrMsg })}\r\n\r\n`);
                 res.end();
