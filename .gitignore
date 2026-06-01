@@ -8,6 +8,10 @@ yarn-error.log*
 .env
 .env.local
 
+__pycache__/
+*.pyc
+
+
 # Runtime data
 pids
 *.pid

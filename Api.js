@@ -147,6 +147,34 @@ async function startServer() {
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Python email-service bridge
+// All outbound email is now delegated to the Python microservice on port 5001.
+// The legacy sendEmailBrevo / sendEmailResend / sendEmailGmail / sendEmail
+// functions are kept below for reference but are no longer called by any route.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Forward an email request to the Python email microservice.
+ * @param {string} endpoint  – e.g. '/send-otp-email'
+ * @param {object} payload   – JSON body to POST
+ */
+async function sendEmailViaPython(endpoint, payload) {
+    const PYTHON_EMAIL_SERVICE_URL = process.env.PYTHON_EMAIL_SERVICE_URL || 'http://localhost:5001';
+    const response = await fetch(`${PYTHON_EMAIL_SERVICE_URL}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        throw new Error(`Python email service error: ${response.status} ${text}`);
+    }
+    return response.json();
+}
+
+// ── Legacy email helpers (kept for reference, no longer called) ───────────────
+
 async function sendEmailBrevo(to, subject, htmlContent) {
     const apiKey = process.env.BREVO_API_KEY;
     if (!apiKey) throw new Error('BREVO_API_KEY is not defined');
@@ -312,7 +340,7 @@ function getEmailTemplate(title, content, buttonText = null, buttonLink = null, 
     `;
 }
 
-// Wrapper to try multiple services in case of failure (e.g. SMTP blocked on Render)
+// Legacy wrapper (kept for reference, no longer called by routes)
 async function sendEmail(to, subject, htmlContent) {
     const preferredService = process.env.EMAIL_SERVICE?.toLowerCase() || 'resend';
 
@@ -590,7 +618,7 @@ function authenticateAdmin(req, res, next) {
 
 app.get('/test-email', async (req, res) => {
     try {
-        await sendEmail(process.env.EMAIL_USER, 'Test Email', 'This is a test email');
+        await sendEmailViaPython('/send-test-email', { to: process.env.EMAIL_USER });
         res.send('Test email sent successfully');
     } catch (error) {
         console.error('Test email failed:', error);
@@ -648,25 +676,15 @@ app.post('/api/contact', async (req, res) => {
         // Save to database
         await contactSubmissions.insertOne(ticket);
 
-        const emailHtml = getEmailTemplate(
-            'Ticket Created: ' + ticket.ticketId,
-            `
-            <p>Hello ${name},</p>
-            <p>Thank you for contacting us! We've received your message and will respond within 24 hours.</p>
-            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                <p style="margin: 0;"><strong>Ticket ID:</strong> ${ticket.ticketId}</p>
-                <p style="margin: 10px 0 0 0;"><strong>Subject:</strong> ${subject}</p>
-            </div>
-            <p><strong>Your Message:</strong></p>
-            <blockquote style="border-left: 4px solid #3498db; padding-left: 15px; font-style: italic; color: #555;">
-                ${message.replace(/\n/g, '<br>')}
-            </blockquote>
-            <p>You can reply directly to this email to add more information.</p>
-            `
-        );
-
+        // Send confirmation email via Python microservice
         try {
-            await sendEmail(email, `Ticket Created: ${ticket.ticketId}`, emailHtml);
+            await sendEmailViaPython('/send-contact-email', {
+                to: email,
+                name,
+                subject,
+                message,
+                ticketId: ticket.ticketId
+            });
             console.log(`[API] Contact ticket confirmation email sent to ${email}`);
         } catch (emailError) {
             console.error(`[API] Contact ticket confirmation email failed: ${emailError.message}`);
@@ -732,43 +750,16 @@ app.put('/api/admin/tickets/:id', authenticateAdmin, async (req, res) => {
 
 async function sendTicketUpdateEmail(ticket, status) {
     try {
-        let statusText = status;
-        let statusColor = '#3498db'; // blue for in-progress
-
-        if (status === 'resolved') {
-            statusText = 'Resolved';
-            statusColor = '#27ae60'; // green
-        } else if (status === 'in-progress') {
-            statusText = 'In Progress';
-        }
-
-        const emailHtml = getEmailTemplate(
-            `Ticket Update: ${statusText}`,
-            `
-            <p>Hello ${ticket.name},</p>
-            <p>Your support ticket status has been updated to <strong>${statusText}</strong>.</p>
-            
-            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 25px 0; border: 1px solid #eee;">
-                <h3 style="margin-top: 0; color: #2c3e50; font-size: 16px;">Ticket Details</h3>
-                <p style="margin: 5px 0;"><strong>Ticket ID:</strong> ${ticket.ticketId}</p>
-                <p style="margin: 5px 0;"><strong>Subject:</strong> ${ticket.subject}</p>
-                <p style="margin: 5px 0;"><strong>New Status:</strong> <span style="color: ${statusColor}; font-weight: bold;">${statusText}</span></p>
-                
-                ${status === 'resolved' && ticket.resolutionNotes ? `
-                <p style="margin: 15px 0 5px 0;"><strong>Resolution Details:</strong></p>
-                <div style="background-color: #fff; padding: 15px; border-radius: 5px; border: 1px solid #eee; font-style: italic; color: #444;">
-                    ${ticket.resolutionNotes.replace(/\n/g, '<br>')}
-                </div>
-                ` : ''}
-            </div>
-            
-            <p>If you have any further questions, please feel free to reply to this email.</p>
-            <p>Best regards,<br>The CodeStream Team</p>
-            `
-        );
-
-        await sendEmail(ticket.email, `Ticket Update: ${ticket.ticketId} - ${statusText}`, emailHtml);
-        console.log(`[API] Ticket status update email sent to ${ticket.email} (${statusText})`);
+        // Delegate to Python microservice
+        await sendEmailViaPython('/send-ticket-update-email', {
+            to: ticket.email,
+            name: ticket.name,
+            ticketId: ticket.ticketId,
+            subject: ticket.subject,
+            status,
+            resolutionNotes: ticket.resolutionNotes || null
+        });
+        console.log(`[API] Ticket status update email sent to ${ticket.email} (${status})`);
     } catch (error) {
         console.error('Error sending ticket update email:', error);
     }
@@ -806,21 +797,9 @@ app.post('/send-otp', otpLimiter, async (req, res) => {
         );
 
         console.log('Attempting to send OTP email to:', email);
-        console.log('Using EMAIL_USER:', process.env.EMAIL_USER ? 'Set' : 'Not Set');
-
-        const emailHtml = getEmailTemplate(
-            'Verify Your Email',
-            `
-            <p>Thank you for choosing CodeStream! Use the verification code below to complete your registration. This code will expire in <strong>5 minutes</strong>.</p>
-            <div class="otp-box">
-                <p class="otp-code">${otp}</p>
-            </div>
-            <p style="color: #666; font-size: 14px; text-align: center;">If you didn't request this code, you can safely ignore this email.</p>
-            `
-        );
 
         try {
-            await sendEmail(email, 'Your OTP for Registration', emailHtml);
+            await sendEmailViaPython('/send-otp-email', { to: email, otp });
             console.log('Email sent successfully to:', email);
             res.json({ message: 'OTP sent successfully' });
         } catch (emailError) {
@@ -1114,17 +1093,8 @@ app.post('/forgot-password', passwordResetLimiter, async (req, res) => {
         const host = req.headers.host;
         const resetLink = `${protocol}://${host}/reset-password?token=${token}`;
 
-        const emailHtml = getEmailTemplate(
-            'Password Reset Request',
-            `
-            <p>We received a request to reset your password for your CodeStream account. Click the button below to choose a new password. This link will expire in <strong>1 hour</strong>.</p>
-            `,
-            'Reset Password',
-            resetLink
-        );
-
         try {
-            await sendEmail(email, 'Password Reset Request', emailHtml);
+            await sendEmailViaPython('/send-reset-email', { to: email, resetLink });
             res.json({
                 message: 'Password reset email sent',
                 token
@@ -2529,7 +2499,7 @@ app.delete('/api/admin/tickets/:id', authenticateAdmin, async (req, res) => {
             return res.status(404).json({ error: 'Ticket not found' });
         }
 
-        // Optionally send deletion notification email
+        // Send deletion notification email via Python microservice
         await sendDeletionEmail(ticket);
 
         res.json({ success: true, message: 'Ticket deleted successfully' });
@@ -2541,30 +2511,13 @@ app.delete('/api/admin/tickets/:id', authenticateAdmin, async (req, res) => {
 
 async function sendDeletionEmail(ticket) {
     try {
-        const mailOptions = {
-            from: `CodeEditor Support <${process.env.EMAIL_USER}>`,
+        await sendEmailViaPython('/send-deletion-email', {
             to: ticket.email,
-            subject: `Your ticket ${ticket.ticketId} has been processed`,
-            html: `
-                <h2>Your Support Ticket Has Been Processed</h2>
-                <p>Hello ${ticket.name},</p>
-                <p>We're writing to inform you that your support ticket has been processed and closed.</p>
-                
-                <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                    <h3>Ticket Details</h3>
-                    <p><strong>Ticket ID:</strong> ${ticket.ticketId}</p>
-                    <p><strong>Subject:</strong> ${ticket.subject}</p>
-                    <p><strong>Status:</strong> Closed</p>
-                    <p><strong>Date Submitted:</strong> ${new Date(ticket.createdAt).toLocaleString()}</p>
-                </div>
-                
-                <p>If you have any further questions, please don't hesitate to contact us.</p>
-                
-                <p>Best regards,<br>The CodeEditor Team</p>
-            `
-        };
-
-        await transporter.sendMail(mailOptions);
+            name: ticket.name,
+            ticketId: ticket.ticketId,
+            subject: ticket.subject,
+            createdAt: ticket.createdAt
+        });
         console.log(`Deletion email sent to ${ticket.email}`);
     } catch (error) {
         console.error('Error sending deletion email:', error);
