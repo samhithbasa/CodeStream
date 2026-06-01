@@ -3198,8 +3198,8 @@ app.post('/api/ai/generate', async (req, res) => {
             const apiKey = keys[attemptIndex];
             console.log(`[AI] Attempting AI generation with Groq API Key index: ${attemptIndex}`);
 
-            const primaryModel = image ? "llama-3.2-90b-vision-preview" : "llama-3.3-70b-versatile";
-            const fallbackModel = image ? "llama-3.2-11b-vision-preview" : "llama-3.1-8b-instant";
+            const primaryModel = image ? "meta-llama/llama-4-scout-17b-16e-instruct" : "llama-3.3-70b-versatile";
+            const fallbackModel = image ? "meta-llama/llama-4-scout-17b-16e-instruct" : "llama-3.1-8b-instant";
 
             try {
                 const groq = new Groq({ apiKey });
