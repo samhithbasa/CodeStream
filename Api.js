@@ -3247,21 +3247,38 @@ app.post('/api/ai/generate', async (req, res) => {
         res.setHeader('Connection', 'keep-alive');
         res.flushHeaders();
 
-        for await (const chunk of streamResult.stream) {
-            let chunkText = '';
-            try {
-                chunkText = chunk.text();
-            } catch (err) {
-                console.warn('[AI] Error reading chunk text:', err.message);
+        // Consume the stream inside its own try-catch so mid-stream
+        // parsing failures (e.g. "Failed to parse stream") are caught
+        // gracefully instead of crashing the Node process.
+        try {
+            for await (const chunk of streamResult.stream) {
+                let chunkText = '';
+                try {
+                    chunkText = chunk.text();
+                } catch (err) {
+                    console.warn('[AI] Error reading chunk text:', err.message);
+                }
+                if (chunkText) {
+                    res.write(`data: ${JSON.stringify({ token: chunkText })}\r\n\r\n`);
+                    if (res.flush) res.flush();
+                }
             }
-            if (chunkText) {
-                res.write(`data: ${JSON.stringify({ token: chunkText })}\r\n\r\n`);
-                if (res.flush) res.flush();
+
+            res.write(`data: ${JSON.stringify({ done: true })}\r\n\r\n`);
+            res.end();
+        } catch (streamError) {
+            console.error('[AI] Stream consumption error (server kept alive):', streamError.message || streamError);
+            const streamErrMsg = streamError.message?.includes('parse stream')
+                ? 'AI response stream was interrupted. Please try again.'
+                : `AI stream error: ${streamError.message || 'Unknown error'}`;
+            try {
+                res.write(`data: ${JSON.stringify({ error: streamErrMsg })}\r\n\r\n`);
+                res.end();
+            } catch (writeErr) {
+                console.error('[AI] Failed to write stream error to client:', writeErr.message);
             }
         }
 
-        res.write(`data: ${JSON.stringify({ done: true })}\r\n\r\n`);
-        res.end();
 
     } catch (error) {
         console.error('AI Generation Error:', error);
@@ -3282,6 +3299,15 @@ app.post('/api/ai/generate', async (req, res) => {
 
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'landing.html'));
+});
+
+// Global exception handlers to prevent background promise/stream parsing errors from crashing Node
+process.on('uncaughtException', (err) => {
+    console.error('💥 [Uncaught Exception] Server kept alive. Error:', err.message || err, err.stack);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('💥 [Unhandled Rejection] Server kept alive. Reason:', reason);
 });
 
 startServer();
