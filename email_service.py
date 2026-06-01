@@ -194,7 +194,7 @@ def send_email(to, subject, html):
     msg["From"]    = f"CodeStream <{os.environ['EMAIL_USER']}>"
     msg["To"]      = to
     msg.attach(MIMEText(html, "html"))
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+    with smtplib.SMTP_SSL("smtp.gmail.com", 587) as server:
         server.login(os.environ["EMAIL_USER"], os.environ["EMAIL_PASS"])
         server.sendmail(os.environ["EMAIL_USER"], to, msg.as_string())
 
