@@ -1,25 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Redirecting to Register...</title>
+    <title>Redirecting to Register…</title>
     <script>
-        // Immediately redirect to the merged 3D login/register page with register mode enabled
-        const urlParams = new URLSearchParams(window.location.search);
-        let redirectUrl = 'login.html?mode=register';
-        // Preserve any URL parameters (like redirect parameter)
-        urlParams.forEach((value, key) => {
-            if (key !== 'mode') {
-                redirectUrl += `&${key}=${encodeURIComponent(value)}`;
-            }
-        });
-        window.location.replace(redirectUrl);
+        const p = new URLSearchParams(window.location.search);
+        let url = 'login.html?mode=register';
+        p.forEach((v, k) => { if (k !== 'mode') url += `&${k}=${encodeURIComponent(v)}`; });
+        window.location.replace(url);
     </script>
 </head>
-<body>
-    <p style="font-family: system-ui, sans-serif; text-align: center; margin-top: 50px; color: #666;">
-        Redirecting you to the registration page... If you are not redirected, <a href="login.html?mode=register">click here</a>.
-    </p>
+
+<body style="font-family:sans-serif;text-align:center;margin-top:50px;color:#666">
+    Redirecting… <a href="login.html?mode=register">click here</a> if not redirected.
 </body>
+
 </html>
