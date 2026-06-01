@@ -38,13 +38,44 @@
     </div>
 
     <div class="main">
-        <p>Turn Your Ideas into Code!</p>
-        <p class="text">Write any Programming Language, see instant results, and share your projects with the world</p>
-        <div class="button-group">
-            <button class="primary-btn"><a href="/editor">Start Coding</a></button>
-            <button class="secondary-btn"><a href="/frontend-editor">🚀 Simple Web Playground</a></button>
+        <div class="hero-content">
+            <p>Turn Your Ideas into Code!</p>
+            <p class="text">Write any Programming Language, see instant results, and share your projects with the world</p>
+            <div class="button-group">
+                <button class="primary-btn"><a href="/editor">Start Coding</a></button>
+                <button class="secondary-btn"><a href="/frontend-editor">🚀 Simple Web Playground</a></button>
+            </div>
+        </div>
+        <div class="hero-visual">
+            <div class="tilt-card-container">
+                <div class="tilt-card" id="tilt-card">
+                    <div class="card-header">
+                        <div class="window-buttons">
+                            <span class="dot close"></span>
+                            <span class="dot minimize"></span>
+                            <span class="dot expand"></span>
+                        </div>
+                        <div class="window-title">Api.js</div>
+                    </div>
+                    <div class="card-body">
+                        <pre class="code-snippet"><code><span class="token keyword">import</span> <span class="token class-name">CodeStream</span> <span class="token keyword">from</span> <span class="token string">'codestream'</span><span class="token punctuation">;</span>
+
+<span class="token keyword">const</span> <span class="token variable">idea</span> <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Idea</span><span class="token punctuation">(</span><span class="token string">'Vibe coding with 3D energy'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token keyword">const</span> <span class="token variable">app</span> <span class="token operator">=</span> <span class="token class-name">CodeStream</span><span class="token punctuation">.</span><span class="token method">compile</span><span class="token punctuation">(</span><span class="token variable">idea</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">// Compile and experience the magic</span>
+<span class="token variable">app</span><span class="token punctuation">.</span><span class="token method">run</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+    <span class="token property">animation</span><span class="token operator">:</span> <span class="token string">'3D perspective'</span><span class="token punctuation">,
+    theme: 'Responsive'</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre>
+                    </div>
+                </div>
+                <!-- Glowing ambient background behind the card -->
+                <div class="card-glow"></div>
+            </div>
         </div>
     </div>
+
 
     <div class="footer">
         <p>An interactive online code editor designed for developers to write, test, and share any Language

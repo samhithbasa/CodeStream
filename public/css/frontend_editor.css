@@ -304,8 +304,8 @@ body.night-mode #theme-toggle:hover {
     border: none;
     background: none;
     cursor: pointer;
-    color: #94a3b8;
-    font-weight: 500;
+    color: #475569; /* Darker Slate for readability in light mode */
+    font-weight: 600;
     font-size: 14px;
     letter-spacing: 0.02em;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -326,8 +326,8 @@ body.night-mode #theme-toggle:hover {
 }
 
 .tab-btn.active {
-    color: #fff;
-    background: rgba(255, 255, 255, 0.05);
+    color: var(--primary-color); /* Indigo in light mode */
+    background: rgba(79, 70, 229, 0.05); /* Soft indigo tint */
 }
 
 .tab-btn.active::after {
@@ -335,13 +335,25 @@ body.night-mode #theme-toggle:hover {
 }
 
 .tab-btn:hover:not(.active) {
-    color: #e2e8f0;
+    color: #0f172a;
+    background: rgba(0, 0, 0, 0.03);
+}
+
+/* Night Mode specific overrides for tab buttons */
+.night-mode .tab-btn {
+    color: #94a3b8;
+}
+
+.night-mode .tab-btn.active {
+    color: #fff;
     background: rgba(255, 255, 255, 0.05);
 }
 
 .night-mode .tab-btn:hover:not(.active) {
+    color: #e2e8f0;
     background: rgba(255, 255, 255, 0.05);
 }
+
 
 .editor-content {
     flex: 1;

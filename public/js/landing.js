@@ -27,6 +27,35 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
 
+    // 3D Card Tilt Animation
+    const card = document.getElementById("tilt-card");
+    const container = document.querySelector(".main");
+
+    if (card && container) {
+        container.addEventListener("mousemove", (e) => {
+            const rect = container.getBoundingClientRect();
+            const x = e.clientX - rect.left - (rect.width / 2);
+            const y = e.clientY - rect.top - (rect.height / 2);
+
+            // Cap rotation angle at 12 degrees for realistic depth
+            const rotX = -(y / (rect.height / 2)) * 12;
+            const rotY = (x / (rect.width / 2)) * 12;
+
+            card.style.transform = `rotateX(${rotX}deg) rotateY(${rotY}deg) translateZ(10px)`;
+        });
+
+        container.addEventListener("mouseleave", () => {
+            // Smooth snap back
+            card.style.transition = "transform 0.5s cubic-bezier(0.25, 0.8, 0.25, 1)";
+            card.style.transform = "rotateX(0deg) rotateY(0deg) translateZ(0)";
+        });
+
+        container.addEventListener("mouseenter", () => {
+            // Remove transitions during active tracking for instant feedback
+            card.style.transition = "none";
+        });
+    }
+
     await updateAuthUI();
 });
 

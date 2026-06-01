@@ -343,6 +343,11 @@ header #logo:hover {
     box-shadow: 0 0 15px rgba(0, 212, 255, 0.2);
 }
 
+.terminal-container label {
+    color: #F8F8F2 !important;
+}
+
+
 #terminal {
     height: 100%;
     width: 100%;
